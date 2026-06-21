@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Portaal | Amsterdam Roleplay Overheid</title>
+  <meta name="description" content="Amsterdam Roleplay overheid portaal voor diensten, handboeken, kennistoetsen en procedures." />
+  <link rel="icon" type="image/png" href="assets/logo-amsterdam-roleplay.png" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body data-page="home" class="login-page">
+  <main>
+    <section class="login-screen">
+      <div class="login-card">
+        <img class="login-logo" src="assets/logo-amsterdam-roleplay.png" alt="" />
+        <p class="eyebrow">Beveiligde overheidsomgeving</p>
+        <h1>Overheid <span>Portaal</span></h1>
+        <p class="login-lead">Log in met Discord. Daarna checkt de server je rollen en krijg je alleen toegang tot jouw dienst.</p>
+        <div class="auth-status" data-auth-status>Niet ingelogd. Kies een dienst of log in via Discord.</div>
+        <a class="discord-login" href="/api/overheid/auth/login">Inloggen met Discord</a>
+        <div class="login-divider"><span>Dienst kiezen</span></div>
+        <div class="login-services">
+    <a class="login-service tone-blue" href="/api/overheid/auth/login?service=politie" data-service-choice="politie">
+      <span>POL</span>
+      <strong>Politie</strong>
+      <small>Rol vereist</small>
+    </a>
+    <a class="login-service tone-gold is-closed" href="#" aria-disabled="true">
+      <span>KMA</span>
+      <strong>KMar / Justitie</strong>
+      <small>Gesloten</small>
+    </a>
+    <a class="login-service tone-red" href="/api/overheid/auth/login?service=ambulance" data-service-choice="ambulance">
+      <span>AMB</span>
+      <strong>Ambulance</strong>
+      <small>Rol vereist</small>
+    </a>
+    <a class="login-service tone-green" href="/api/overheid/auth/login?service=pechhulp" data-service-choice="pechhulp">
+      <span>ANW</span>
+      <strong>ANWB / Pechhulp</strong>
+      <small>Rol vereist</small>
+    </a></div>
+        <div class="login-links">
+          <a href="/">Terug naar hoofdsite</a>
+        </div>
+        <footer>Amsterdam Roleplay overheid portaal</footer>
+      </div>
+    </section></main>
+  <script src="portal.js"></script>
+</body>
+</html>
