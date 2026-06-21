@@ -52,6 +52,36 @@ function certificateCode(service = "POL") {
   return `AMRP-${prefix}-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
 }
 
+function publicPortalUrl() {
+  return String(process.env.OVERHEID_PUBLIC_URL || "").replace(/\/+$/, "");
+}
+
+function getBearerToken(req) {
+  const auth = String(req.headers.authorization || "");
+  if (auth.toLowerCase().startsWith("bearer ")) return auth.slice(7).trim();
+  return String(req.headers["x-api-key"] || "").trim();
+}
+
+function safeEqual(a, b) {
+  const left = Buffer.from(String(a || ""));
+  const right = Buffer.from(String(b || ""));
+  if (!left.length || left.length !== right.length) return false;
+  return crypto.timingSafeEqual(left, right);
+}
+
+function requireBotApiKey(req, res) {
+  const expected = process.env.BOT_CERTIFICATE_API_KEY || "";
+  if (!expected) {
+    sendJson(res, 503, { ok: false, message: "BOT_CERTIFICATE_API_KEY ontbreekt in Render." });
+    return false;
+  }
+  if (!safeEqual(getBearerToken(req), expected)) {
+    sendJson(res, 401, { ok: false, message: "Ongeldige bot API key." });
+    return false;
+  }
+  return true;
+}
+
 async function readBody(req) {
   return new Promise((resolve, reject) => {
     let body = "";
@@ -399,6 +429,53 @@ async function handleIssueCertificate(req, res) {
   return true;
 }
 
+async function handleBotIssueCertificate(req, res) {
+  if (!requireBotApiKey(req, res)) return true;
+  if (req.method !== "POST") {
+    sendJson(res, 405, { ok: false, message: "Methode niet toegestaan." });
+    return true;
+  }
+  try {
+    const body = await readBody(req);
+    const score = Number(body.score || body.percent || 0);
+    const maxScore = Math.max(1, Number(body.maxScore || body.max || 100));
+    const percent = Math.round((score / maxScore) * 100);
+    const passPercent = Number(body.passPercent || body.slagingsgrens || 90);
+    if (percent < passPercent) throw new Error("Score is niet hoog genoeg voor een certificaat.");
+
+    const botSession = {
+      user: {
+        id: "overheid-bot",
+        username: cleanField(body.issuedBy || "Overheid Bot", 120),
+      },
+    };
+    const certificates = await readItems("certificates");
+    const item = normalizeCertificate({
+      service: body.service || "Politie",
+      holderName: body.holderName || body.username || body.name,
+      discordId: body.discordId || body.userId,
+      quizTitle: body.quizTitle || body.trainingName || body.training || body.title,
+      score,
+      maxScore,
+      passPercent,
+      status: body.status || "Geldig",
+      verifierNotes: body.verifierNotes || body.notes || "Uitgegeven via Discord bot.",
+    }, botSession);
+
+    certificates.push(item);
+    await writeItems("certificates", certificates);
+    await addLog(botSession, "Bot certificaat uitgegeven", item.code, `${item.holderName} - ${item.quizTitle}`);
+    sendJson(res, 201, {
+      ok: true,
+      certificate: publicCertificate(item),
+      verifyUrl: `${publicPortalUrl() || ""}/overheid/verify.html?code=${encodeURIComponent(item.code)}`,
+    });
+  } catch (error) {
+    sendJson(res, 400, { ok: false, message: error.message });
+  }
+  return true;
+}
+
 function publicCertificate(item) {
   if (!item) return null;
   return {
@@ -498,6 +575,7 @@ async function handleSummary(req, res) {
 
 async function handle(req, res, url) {
   if (url.pathname === "/api/overheid/certificates/issue") return handleIssueCertificate(req, res);
+  if (url.pathname === "/api/overheid/certificates/bot-issue") return handleBotIssueCertificate(req, res);
   if (url.pathname === "/api/overheid/certificates/verify" && req.method === "GET") return handleVerifyCertificate(req, res, url);
   if (url.pathname === "/api/overheid/service-settings/public" && req.method === "GET") return handlePublicServiceSettings(req, res);
   if (url.pathname === "/api/overheid/handbooks/public" && req.method === "GET") return handlePublicCollection(req, res, "handbooks", "handbooks");

@@ -33,6 +33,7 @@ https://overheid.amsterdamrp.store/api/overheid/auth/callback
 - Adminpagina voor dossiers, taken, sollicitaties, certificaten, kennistoetsen, handboeken, dienststatus en trainingen.
 - Certificaten worden server-side opgeslagen en kunnen via `/overheid/verify.html` gecontroleerd worden.
 - Extra handboeken en toetsen kunnen via de adminpagina toegevoegd worden.
+- Discord bots kunnen certificaten uitgeven via `/api/overheid/certificates/bot-issue`.
 
 ## Supabase opslag
 
@@ -44,8 +45,13 @@ https://overheid.amsterdamrp.store/api/overheid/auth/callback
 SUPABASE_URL=https://jouw-project.supabase.co
 SUPABASE_SECRET_KEY=je_server_side_secret_key
 SUPABASE_RECORDS_TABLE=portal_records
+BOT_CERTIFICATE_API_KEY=een_lange_random_secret
 ```
 
 Zet de Supabase secret key nooit in `public/`, nooit in GitHub en nooit in browser-JavaScript.
 
 Zonder Supabase gebruikt de server tijdelijk JSON-bestanden voor lokaal testen.
+
+## Bot certificaten
+
+Zie `docs/bot-certificate-integration.md` voor de `bot.js` aanpassing. Gebruik dezelfde `BOT_CERTIFICATE_API_KEY` in Render en in de bot environment.
