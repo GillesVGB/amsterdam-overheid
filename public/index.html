@@ -19,26 +19,30 @@
         <div class="auth-status" data-auth-status>Niet ingelogd. Kies hieronder een dienst om in te loggen.</div>
         <div class="login-divider"><span>Kies je dienst</span></div>
         <div class="login-services">
-    <a class="login-service tone-blue" href="/api/overheid/auth/login?service=politie" data-service-choice="politie">
+    <a class="login-service tone-blue" href="#" data-service-choice="politie" data-service-label="Politie">
       <span>POL</span>
       <strong>Politie</strong>
-      <small>Inloggen met Discord</small>
+      <small>Selecteer dienst</small>
     </a>
     <a class="login-service tone-gold is-closed" href="#" aria-disabled="true">
       <span>KMA</span>
       <strong>KMar / Justitie</strong>
       <small>Gesloten</small>
     </a>
-    <a class="login-service tone-red" href="/api/overheid/auth/login?service=ambulance" data-service-choice="ambulance">
+    <a class="login-service tone-red" href="#" data-service-choice="ambulance" data-service-label="Ambulance">
       <span>AMB</span>
       <strong>Ambulance</strong>
-      <small>Inloggen met Discord</small>
+      <small>Selecteer dienst</small>
     </a>
-    <a class="login-service tone-green" href="/api/overheid/auth/login?service=pechhulp" data-service-choice="pechhulp">
+    <a class="login-service tone-green" href="#" data-service-choice="pechhulp" data-service-label="ANWB / Pechhulp">
       <span>ANW</span>
       <strong>ANWB / Pechhulp</strong>
-      <small>Inloggen met Discord</small>
+      <small>Selecteer dienst</small>
     </a></div>
+        <div class="selected-login" data-selected-login hidden>
+          <span data-selected-service>Geen dienst gekozen</span>
+          <a class="discord-login compact" href="#" data-service-login>Inloggen met Discord</a>
+        </div>
         <div class="login-links">
           <a href="https://staff.amsterdamrp.store/staff/">Staff portaal</a>
           <a href="https://amsterdamrp.store/">Terug naar hoofdsite</a>

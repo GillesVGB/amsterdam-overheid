@@ -11,6 +11,35 @@ function getLoginErrorMessage(code, service) {
   return messages[code] || "";
 }
 
+function initServiceChoice() {
+  const panel = document.querySelector("[data-selected-login]");
+  const selectedLabel = document.querySelector("[data-selected-service]");
+  const loginLink = document.querySelector("[data-service-login]");
+  const choices = Array.from(document.querySelectorAll("[data-service-choice]"));
+  const status = document.querySelector("[data-auth-status]");
+
+  if (!panel || !selectedLabel || !loginLink || !choices.length) return;
+
+  choices.forEach((choice) => {
+    choice.addEventListener("click", (event) => {
+      event.preventDefault();
+
+      choices.forEach((item) => item.classList.remove("is-selected"));
+      choice.classList.add("is-selected");
+
+      const service = choice.dataset.serviceChoice;
+      const label = choice.dataset.serviceLabel || service;
+      selectedLabel.textContent = "Gekozen dienst: " + label;
+      loginLink.href = "/api/overheid/auth/login?service=" + encodeURIComponent(service);
+      panel.hidden = false;
+
+      if (status && !status.classList.contains("is-ok") && !status.classList.contains("is-error")) {
+        status.textContent = "Dienst gekozen. Log nu in met Discord om je rol te controleren.";
+      }
+    });
+  });
+}
+
 async function initAuthStatus() {
   const status = document.querySelector("[data-auth-status]");
   if (window.location.protocol === "file:") return;
@@ -171,5 +200,6 @@ function initQuizzes() {
   renderList();
 }
 
+initServiceChoice();
 initAuthStatus();
 initQuizzes();
