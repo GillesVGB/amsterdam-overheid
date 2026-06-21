@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Beheer | Amsterdam Roleplay Overheid</title>
+  <meta name="description" content="Amsterdam Roleplay overheid beheer voor dossiers, opleidingen, sollicitaties en logs." />
+  <link rel="icon" type="image/png" href="assets/logo-amsterdam-roleplay.png" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body data-page="admin.html">
+  <header class="portal-header">
+    <nav class="portal-nav container" aria-label="Overheid beheer navigatie">
+      <a class="brand" href="index.html" aria-label="Amsterdam Roleplay overheid home">
+        <img src="assets/logo-amsterdam-roleplay.png" alt="" />
+        <span><strong>Amsterdam Roleplay</strong><small>Overheid Portaal</small></span>
+      </a>
+      <div class="top-links">
+        <a href="index.html">Diensten</a>
+        <a href="politie/index.html">Politie</a>
+        <a href="https://staff.amsterdamrp.store/staff/">Staff</a>
+        <a href="https://amsterdamrp.store/">Hoofdsite</a>
+        <a href="/api/overheid/auth/logout">Uitloggen</a>
+      </div>
+    </nav>
+  </header>
+  <main>
+    <section class="hero-panel">
+      <div class="container hero-grid">
+        <div class="hero-copy">
+          <p class="eyebrow">Beheer</p>
+          <h1>Overheid beheer</h1>
+          <p>Beheer dossiers, opleidingstaken, dienstsollicitaties, certificaatopvolging en interne logs voor de overheidsteams.</p>
+        </div>
+        <div class="metric-grid" data-overheid-summary>
+          <div><span>Status</span><strong>Laden</strong></div>
+          <div><span>Opslag</span><strong>Supabase</strong></div>
+          <div><span>Modules</span><strong>8</strong></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="container section">
+      <div class="admin-grid">
+        <article class="admin-card">
+          <div class="admin-card-title"><span>*</span>Systeemstatus</div>
+          <div class="admin-status-list">
+            <div><span>Discord login</span><strong>Actief</strong><p>OAuth controleert toegang per dienst en adminrol.</p></div>
+            <div><span>Opslag</span><strong>Supabase</strong><p>Dossiers, taken, sollicitaties, certificaten en logs staan in de database.</p></div>
+            <div><span>Toegang</span><strong>Adminrol</strong><p>Alleen rollen uit DISCORD_ROLE_ADMIN kunnen deze pagina openen.</p></div>
+          </div>
+        </article>
+        <article class="admin-card">
+          <div class="admin-card-title"><span>+</span>Snelle acties</div>
+          <div class="admin-actions">
+            <a class="button" href="politie/toetsen.html">Kennistoetsen</a>
+            <a class="button secondary" href="politie/handboeken.html">Handboeken</a>
+            <a class="button secondary" href="politie/trainingen.html">Trainingen</a>
+            <a class="button secondary" href="verify.html">Certificaat verifieren</a>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="container section slim">
+      <div class="section-head compact">
+        <p class="eyebrow">Dossier-systeem</p>
+        <h2>Overheid dossiers</h2>
+      </div>
+      <div class="admin-module-grid">
+        <form class="admin-card admin-form" data-overheid-form="dossiers">
+          <div class="admin-card-title"><span>+</span>Dossier toevoegen</div>
+          <div class="form-grid">
+            <label><span>Dienst</span><select name="service"><option>Politie</option><option>Ambulance</option><option>ANWB / Pechhulp</option><option>KMar / Justitie</option></select></label>
+            <label><span>Naam</span><input name="subjectName" required placeholder="Speler, medewerker of kandidaat" /></label>
+            <label><span>Discord ID</span><input name="discordId" /></label>
+            <label><span>Type</span><select name="category"><option>Notitie</option><option>Waarschuwing</option><option>Klacht</option><option>Gesprek</option><option>Opleiding</option><option>Opgelost</option></select></label>
+            <label><span>Prioriteit</span><select name="severity"><option>Laag</option><option>Middel</option><option>Hoog</option><option>Kritiek</option></select></label>
+            <label><span>Status</span><select name="status"><option>Open</option><option>In behandeling</option><option>Gesloten</option></select></label>
+            <label><span>Toegewezen aan</span><input name="assignedTo" placeholder="Docent, leiding of dienst" /></label>
+            <label><span>Tags</span><input name="tags" placeholder="IBT, klacht, gesprek" /></label>
+          </div>
+          <label><span>Beschrijving</span><textarea name="description" required rows="4"></textarea></label>
+          <label><span>Bewijslinks</span><textarea name="evidenceLinks" rows="3" placeholder="Een link per regel"></textarea></label>
+          <label><span>Interne notities</span><textarea name="notes" rows="3"></textarea></label>
+          <label><span>Actie / opvolging</span><textarea name="action" rows="3"></textarea></label>
+          <div class="form-actions"><button class="button" type="submit">Dossier opslaan</button><span data-overheid-feedback="dossiers"></span></div>
+        </form>
+        <div class="admin-card">
+          <div class="admin-card-title"><span>=</span>Dossiers</div>
+          <div class="record-grid" data-overheid-list="dossiers"><p class="empty-text">Dossiers laden...</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="container section slim">
+      <div class="section-head compact">
+        <p class="eyebrow">Taken & opleiding</p>
+        <h2>Werk verdelen per dienst</h2>
+      </div>
+      <div class="admin-module-grid">
+        <form class="admin-card admin-form" data-overheid-form="tasks">
+          <div class="admin-card-title"><span>+</span>Taak toevoegen</div>
+          <div class="form-grid">
+            <label><span>Titel</span><input name="title" required placeholder="Training, examen of melding" /></label>
+            <label><span>Dienst</span><select name="service"><option>Politie</option><option>Ambulance</option><option>ANWB / Pechhulp</option><option>KMar / Justitie</option></select></label>
+            <label><span>Type</span><select name="type"><option>Opleiding</option><option>Kennistoets</option><option>Certificaat</option><option>Klacht</option><option>Melding</option></select></label>
+            <label><span>Toegewezen aan</span><input name="assignee" /></label>
+            <label><span>Prioriteit</span><select name="priority"><option>Normaal</option><option>Hoog</option><option>Kritiek</option><option>Laag</option></select></label>
+            <label><span>Status</span><select name="status"><option>Open</option><option>Bezig</option><option>Wachten</option><option>Gesloten</option></select></label>
+          </div>
+          <label><span>Beschrijving</span><textarea name="description" rows="4"></textarea></label>
+          <label><span>Tags</span><input name="tags" placeholder="IBT, praktijk, certificaat" /></label>
+          <div class="form-actions"><button class="button" type="submit">Taak opslaan</button><span data-overheid-feedback="tasks"></span></div>
+        </form>
+        <div class="admin-card">
+          <div class="admin-card-title"><span>=</span>Taken</div>
+          <div class="record-grid" data-overheid-list="tasks"><p class="empty-text">Taken laden...</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="container section slim">
+      <div class="section-head compact">
+        <p class="eyebrow">Sollicitaties</p>
+        <h2>Dienstaanvragen opvolgen</h2>
+      </div>
+      <div class="admin-module-grid">
+        <form class="admin-card admin-form" data-overheid-form="applications">
+          <div class="admin-card-title"><span>+</span>Sollicitatie toevoegen</div>
+          <div class="form-grid">
+            <label><span>Kandidaat</span><input name="applicantName" required /></label>
+            <label><span>Discord ID</span><input name="discordId" /></label>
+            <label><span>Dienst</span><select name="service"><option>Politie</option><option>Ambulance</option><option>ANWB / Pechhulp</option><option>KMar / Justitie</option></select></label>
+            <label><span>Status</span><select name="status"><option>Nieuw</option><option>In review</option><option>Gesprek gepland</option><option>In opleiding</option><option>Aangenomen</option><option>Afgekeurd</option></select></label>
+            <label><span>Reviewer</span><input name="reviewer" /></label>
+            <label><span>Gesprek</span><input name="interviewAt" /></label>
+          </div>
+          <label><span>Opleiding</span><input name="training" placeholder="Basistraining, IBT, praktijk" /></label>
+          <label><span>Notities</span><textarea name="notes" rows="4"></textarea></label>
+          <div class="form-actions"><button class="button" type="submit">Sollicitatie opslaan</button><span data-overheid-feedback="applications"></span></div>
+        </form>
+        <div class="admin-card">
+          <div class="admin-card-title"><span>=</span>Sollicitaties</div>
+          <div class="record-grid" data-overheid-list="applications"><p class="empty-text">Sollicitaties laden...</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="container section slim">
+      <div class="section-head compact">
+        <p class="eyebrow">Certificaten</p>
+        <h2>Certificaten beheren en verifieren</h2>
+      </div>
+      <div class="admin-module-grid">
+        <form class="admin-card admin-form" data-overheid-form="certificates">
+          <div class="admin-card-title"><span>+</span>Certificaat toevoegen</div>
+          <div class="form-grid">
+            <label><span>Naam</span><input name="holderName" required placeholder="Medewerker" /></label>
+            <label><span>Discord ID</span><input name="discordId" /></label>
+            <label><span>Dienst</span><select name="service"><option>Politie</option><option>Ambulance</option><option>ANWB / Pechhulp</option><option>KMar / Justitie</option></select></label>
+            <label><span>Toets</span><input name="quizTitle" required placeholder="Basistraining" /></label>
+            <label><span>Score</span><input name="score" type="number" min="0" value="0" /></label>
+            <label><span>Max</span><input name="maxScore" type="number" min="1" value="1" /></label>
+            <label><span>Status</span><select name="status"><option>Geldig</option><option>Ingetrokken</option><option>Verlopen</option></select></label>
+            <label><span>Vervalt op</span><input name="expiresAt" placeholder="Optioneel" /></label>
+          </div>
+          <label><span>Verificatienotities</span><textarea name="verifierNotes" rows="3"></textarea></label>
+          <div class="form-actions"><button class="button" type="submit">Certificaat opslaan</button><span data-overheid-feedback="certificates"></span></div>
+        </form>
+        <div class="admin-card">
+          <div class="admin-card-title"><span>=</span>Certificaten</div>
+          <div class="record-grid" data-overheid-list="certificates"><p class="empty-text">Certificaten laden...</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="container section slim">
+      <div class="section-head compact">
+        <p class="eyebrow">Kennistoetsen</p>
+        <h2>Toetsen klaarzetten</h2>
+      </div>
+      <div class="admin-module-grid">
+        <form class="admin-card admin-form" data-overheid-form="quizzes">
+          <div class="admin-card-title"><span>+</span>Toets toevoegen</div>
+          <div class="form-grid">
+            <label><span>Titel</span><input name="title" required placeholder="Rijtraining toets" /></label>
+            <label><span>Dienst</span><select name="service"><option>Politie</option><option>Ambulance</option><option>ANWB / Pechhulp</option><option>KMar / Justitie</option></select></label>
+            <label><span>Rang / opleiding</span><input name="rank" placeholder="Aspirant, Agent, ..." /></label>
+            <label><span>Slagingspercentage</span><input name="passPercent" type="number" min="1" max="100" value="80" /></label>
+            <label><span>Status</span><select name="status"><option>Actief</option><option>Concept</option><option>Inactief</option></select></label>
+          </div>
+          <label><span>Beschrijving</span><textarea name="description" rows="3"></textarea></label>
+          <label><span>Vragen / antwoorden</span><textarea name="questionsText" rows="5" placeholder="Vraag | antwoord A | antwoord B | correct"></textarea></label>
+          <div class="form-actions"><button class="button" type="submit">Toets opslaan</button><span data-overheid-feedback="quizzes"></span></div>
+        </form>
+        <div class="admin-card">
+          <div class="admin-card-title"><span>=</span>Toetsen</div>
+          <div class="record-grid" data-overheid-list="quizzes"><p class="empty-text">Toetsen laden...</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="container section slim">
+      <div class="section-head compact">
+        <p class="eyebrow">Handboeken</p>
+        <h2>Handboeken en links beheren</h2>
+      </div>
+      <div class="admin-module-grid">
+        <form class="admin-card admin-form" data-overheid-form="handbooks">
+          <div class="admin-card-title"><span>+</span>Handboek toevoegen</div>
+          <div class="form-grid">
+            <label><span>Titel</span><input name="title" required placeholder="Basistraining handboek" /></label>
+            <label><span>Dienst</span><select name="service"><option>Politie</option><option>Ambulance</option><option>ANWB / Pechhulp</option><option>KMar / Justitie</option></select></label>
+            <label><span>Categorie</span><input name="category" placeholder="Training, Wetboek, Procedure" /></label>
+            <label><span>Versie</span><input name="version" placeholder="v1.0" /></label>
+            <label><span>Status</span><select name="status"><option>Actief</option><option>Concept</option><option>Inactief</option></select></label>
+            <label><span>Link</span><input name="url" required placeholder="https://..." /></label>
+          </div>
+          <label><span>Notities</span><textarea name="notes" rows="3"></textarea></label>
+          <div class="form-actions"><button class="button" type="submit">Handboek opslaan</button><span data-overheid-feedback="handbooks"></span></div>
+        </form>
+        <div class="admin-card">
+          <div class="admin-card-title"><span>=</span>Handboeken</div>
+          <div class="record-grid" data-overheid-list="handbooks"><p class="empty-text">Handboeken laden...</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="container section slim">
+      <div class="section-head compact">
+        <p class="eyebrow">Diensten</p>
+        <h2>Dienststatus en rollen</h2>
+      </div>
+      <div class="admin-module-grid">
+        <form class="admin-card admin-form" data-overheid-form="serviceSettings">
+          <div class="admin-card-title"><span>+</span>Dienst instellen</div>
+          <div class="form-grid">
+            <label><span>Dienst ID</span><select name="serviceId"><option value="politie">politie</option><option value="kmar">kmar</option><option value="ambulance">ambulance</option><option value="pechhulp">pechhulp</option></select></label>
+            <label><span>Titel</span><input name="title" required placeholder="Politie" /></label>
+            <label><span>Status</span><select name="status"><option>Open</option><option>Gesloten</option></select></label>
+            <label><span>Discord rol</span><input name="roleId" placeholder="Rol ID" /></label>
+          </div>
+          <label><span>Notities</span><textarea name="notes" rows="3" placeholder="Waarom open/gesloten, instructies, ..."></textarea></label>
+          <div class="form-actions"><button class="button" type="submit">Dienst opslaan</button><span data-overheid-feedback="serviceSettings"></span></div>
+        </form>
+        <div class="admin-card">
+          <div class="admin-card-title"><span>=</span>Dienstinstellingen</div>
+          <div class="record-grid" data-overheid-list="serviceSettings"><p class="empty-text">Diensten laden...</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="container section slim">
+      <div class="section-head compact">
+        <p class="eyebrow">Opleiding</p>
+        <h2>Trainingsplanning</h2>
+      </div>
+      <div class="admin-module-grid">
+        <form class="admin-card admin-form" data-overheid-form="trainingPlans">
+          <div class="admin-card-title"><span>+</span>Training plannen</div>
+          <div class="form-grid">
+            <label><span>Titel</span><input name="title" required placeholder="IBT praktijktraining" /></label>
+            <label><span>Dienst</span><select name="service"><option>Politie</option><option>Ambulance</option><option>ANWB / Pechhulp</option><option>KMar / Justitie</option></select></label>
+            <label><span>Docent</span><input name="instructor" /></label>
+            <label><span>Moment</span><input name="plannedAt" placeholder="Datum/tijd" /></label>
+            <label><span>Status</span><select name="status"><option>Gepland</option><option>Bezig</option><option>Afgerond</option><option>Geannuleerd</option></select></label>
+          </div>
+          <label><span>Deelnemers</span><textarea name="participants" rows="3" placeholder="Een naam per regel"></textarea></label>
+          <label><span>Notities</span><textarea name="notes" rows="3"></textarea></label>
+          <div class="form-actions"><button class="button" type="submit">Training opslaan</button><span data-overheid-feedback="trainingPlans"></span></div>
+        </form>
+        <div class="admin-card">
+          <div class="admin-card-title"><span>=</span>Trainingen</div>
+          <div class="record-grid" data-overheid-list="trainingPlans"><p class="empty-text">Trainingen laden...</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="container section slim">
+      <div class="section-head compact">
+        <p class="eyebrow">Logs</p>
+        <h2>Laatste wijzigingen</h2>
+      </div>
+      <div class="admin-card">
+        <div class="record-grid compact" data-overheid-logs><p class="empty-text">Logs laden...</p></div>
+      </div>
+    </section>
+  </main>
+  <footer class="portal-footer">
+    <div class="container footer-row">
+      <span>Amsterdam Roleplay Overheid</span>
+      <span>Interne beheeromgeving.</span>
+    </div>
+  </footer>
+  <script src="portal.js"></script>
+</body>
+</html>

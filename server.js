@@ -6,6 +6,7 @@ const path = require("node:path");
 loadLocalEnv();
 
 const overheidAuth = require("./api/overheid-auth.js");
+const overheidData = require("./api/overheid-data.js");
 
 const publicDir = path.resolve(__dirname, "public");
 const port = Number(process.env.PORT || 3000);
@@ -100,13 +101,18 @@ function createServer() {
       if (await overheidAuth.handle(req, res, url)) return;
     }
 
+    if (url.pathname.startsWith("/api/overheid/")) {
+      await overheidData.handle(req, res, url);
+      return;
+    }
+
     if (url.pathname === "/" || url.pathname === "/overheid") {
       redirect(res, "/overheid/");
       return;
     }
 
     if (url.pathname.startsWith("/overheid/")) {
-      if (!overheidAuth.requirePortalAccess(req, res, url)) return;
+      if (!(await overheidAuth.requirePortalAccess(req, res, url))) return;
       const overheidPath = url.pathname.replace(/^\/overheid/, "") || "/";
       await serveStatic(req, res, overheidPath);
       return;

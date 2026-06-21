@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Certificaat verifieren | Amsterdam Roleplay Overheid</title>
+  <meta name="description" content="Controleer een Amsterdam Roleplay overheid certificaatcode." />
+  <link rel="icon" type="image/png" href="assets/logo-amsterdam-roleplay.png" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body data-page="verify.html">
+  <header class="portal-header">
+    <nav class="portal-nav container" aria-label="Overheid navigatie">
+      <a class="brand" href="index.html" aria-label="Amsterdam Roleplay overheid home">
+        <img src="assets/logo-amsterdam-roleplay.png" alt="" />
+        <span><strong>Amsterdam Roleplay</strong><small>Overheid Portaal</small></span>
+      </a>
+      <div class="top-links">
+        <a href="index.html">Diensten</a>
+        <a href="https://staff.amsterdamrp.store/staff/">Staff</a>
+        <a href="https://amsterdamrp.store/">Hoofdsite</a>
+      </div>
+    </nav>
+  </header>
+  <main>
+    <section class="hero-panel compact-hero">
+      <div class="container hero-grid">
+        <div class="hero-copy">
+          <p class="eyebrow">Certificaatcontrole</p>
+          <h1>Certificaat verifieren</h1>
+          <p>Controleer of een kennistoetscertificaat geldig is en bij welke dienst/toets het hoort.</p>
+        </div>
+        <div class="metric-grid"><div><span>Bron</span><strong>Supabase</strong></div><div><span>Status</span><strong>Live</strong></div></div>
+      </div>
+    </section>
+    <section class="container section">
+      <div class="admin-module-grid">
+        <form class="admin-card admin-form" data-verify-form>
+          <div class="admin-card-title"><span>#</span>Code controleren</div>
+          <label><span>Certificaatcode</span><input name="code" required placeholder="AMRP-POLI-20260621-ABC123" /></label>
+          <div class="form-actions"><button class="button" type="submit">Verifieer</button></div>
+        </form>
+        <div class="admin-card">
+          <div class="admin-card-title"><span>=</span>Resultaat</div>
+          <div data-verify-result><p class="empty-text">Vul een code in om te controleren.</p></div>
+        </div>
+      </div>
+    </section>
+  </main>
+  <footer class="portal-footer">
+    <div class="container footer-row">
+      <span>Amsterdam Roleplay Overheid</span>
+      <span>Certificaatverificatie.</span>
+    </div>
+  </footer>
+  <script src="portal.js"></script>
+</body>
+</html>

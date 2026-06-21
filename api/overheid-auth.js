@@ -1,9 +1,11 @@
 const crypto = require("node:crypto");
+const store = require("./portal-store.js");
 
 const DISCORD_API = "https://discord.com/api/v10";
 const SESSION_COOKIE = "ar_overheid_session";
 const STATE_TTL_MS = 10 * 60 * 1000;
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+const APP_NAME = "overheid";
 
 const services = {
   politie: {
@@ -15,7 +17,7 @@ const services = {
     label: "KMar / Justitie",
     path: "/overheid/diensten/kmar.html",
     roleEnv: "DISCORD_ROLE_KMAR",
-    closed: true,
+    closed: process.env.DISCORD_SERVICE_KMAR_OPEN !== "true",
   },
   ambulance: {
     label: "Ambulance",
@@ -31,6 +33,7 @@ const services = {
 
 const states = new Map();
 const sessions = new Map();
+let serviceSettingsCache = { expiresAt: 0, value: [] };
 
 function splitIds(value) {
   return String(value || "")
@@ -132,15 +135,41 @@ function getSession(req) {
 function getAllowedServices(roleIds, config) {
   const roles = new Set(roleIds || []);
   const isAdmin = config.adminRoleIds.some((roleId) => roles.has(roleId));
-  if (isAdmin) {
-    return Object.entries(services)
-      .filter(([, service]) => !service.closed)
-      .map(([serviceId]) => serviceId);
-  }
+  return Promise.all(Object.entries(config.roleMap).map(async ([serviceId, requiredRoles]) => {
+    if (await isServiceClosed(serviceId)) return null;
+    if (isAdmin || requiredRoles.some((roleId) => roles.has(roleId))) return serviceId;
+    return null;
+  })).then((items) => items.filter(Boolean));
+}
 
-  return Object.entries(config.roleMap)
-    .filter(([serviceId, requiredRoles]) => !services[serviceId]?.closed && requiredRoles.some((roleId) => roles.has(roleId)))
-    .map(([serviceId]) => serviceId);
+async function getServiceSettings() {
+  if (serviceSettingsCache.expiresAt > Date.now()) return serviceSettingsCache.value;
+  if (!store.isConfigured()) {
+    serviceSettingsCache = { expiresAt: Date.now() + 30 * 1000, value: [] };
+    return [];
+  }
+  try {
+    const value = await store.readCollection(APP_NAME, "service-settings");
+    serviceSettingsCache = { expiresAt: Date.now() + 30 * 1000, value };
+    return value;
+  } catch {
+    serviceSettingsCache = { expiresAt: Date.now() + 30 * 1000, value: [] };
+    return [];
+  }
+}
+
+async function isServiceClosed(serviceId) {
+  const setting = (await getServiceSettings()).find((item) => item.serviceId === serviceId);
+  if (setting?.status) return setting.status.toLowerCase() === "gesloten";
+  return Boolean(services[serviceId]?.closed);
+}
+
+function isAdminSession(session) {
+  if (!session) return false;
+  const adminRoleIds = splitIds(process.env.DISCORD_ROLE_ADMIN || process.env.DISCORD_ROLE_STAFF);
+  if (!adminRoleIds.length) return true;
+  const roles = new Set(session.roles || []);
+  return adminRoleIds.some((roleId) => roles.has(roleId));
 }
 
 function getServiceFromPath(pathname) {
@@ -236,7 +265,7 @@ async function handleLogin(req, res, url) {
 
   const service = services[url.searchParams.get("service")] ? url.searchParams.get("service") : "";
   const next = sanitizeNext(url.searchParams.get("next"), service);
-  if (service && services[service]?.closed) {
+  if (service && await isServiceClosed(service)) {
     redirect(res, `/overheid/?error=closed&service=${service}`);
     return;
   }
@@ -248,7 +277,7 @@ async function handleLogin(req, res, url) {
   }
 
   if (session && !service) {
-    redirect(res, "/overheid/?login=success");
+    redirect(res, next || "/overheid/?login=success");
     return;
   }
 
@@ -293,7 +322,7 @@ async function handleCallback(req, res, url) {
       fetchDiscordJson("/users/@me", token.access_token),
       fetchDiscordJson(`/users/@me/guilds/${config.guildId}/member`, token.access_token),
     ]);
-    const allowedServices = getAllowedServices(member.roles, config);
+    const allowedServices = await getAllowedServices(member.roles, config);
     createSession(res, req, user, member, allowedServices);
 
     if (state.service) {
@@ -301,7 +330,7 @@ async function handleCallback(req, res, url) {
       return;
     }
 
-    redirect(res, "/overheid/?login=success");
+    redirect(res, state.next || "/overheid/?login=success");
   } catch (error) {
     redirect(res, `/overheid/?error=discord&message=${encodeURIComponent(error.message)}`);
   }
@@ -318,6 +347,7 @@ function handleMe(req, res) {
     loggedIn: true,
     user: session.user,
     services: session.services,
+    isAdmin: isAdminSession(session),
     labels: Object.fromEntries(Object.entries(services).map(([id, service]) => [id, service.label])),
   });
 }
@@ -353,11 +383,25 @@ async function handle(req, res, url) {
   return false;
 }
 
-function requirePortalAccess(req, res, url) {
+async function requirePortalAccess(req, res, url) {
+  if (url.pathname === "/overheid/admin.html" || url.pathname.startsWith("/overheid/admin/")) {
+    const session = getSession(req);
+    if (!session) {
+      const next = encodeURIComponent(url.pathname + url.search);
+      redirect(res, `/api/overheid/auth/login?next=${next}`);
+      return false;
+    }
+    if (!isAdminSession(session)) {
+      redirect(res, "/overheid/?error=no_access&service=beheer");
+      return false;
+    }
+    return true;
+  }
+
   const service = getServiceFromPath(url.pathname);
   if (!service) return true;
 
-  if (services[service]?.closed) {
+  if (await isServiceClosed(service)) {
     redirect(res, `/overheid/?error=closed&service=${service}`);
     return false;
   }
@@ -378,7 +422,9 @@ function requirePortalAccess(req, res, url) {
 }
 
 module.exports = {
+  getSession,
   handle,
+  isAdminSession,
   requirePortalAccess,
   services,
 };
