@@ -18,6 +18,7 @@ const files = {
   applications: path.join(DATA_DIR, "overheid-applications.json"),
   certificates: path.join(DATA_DIR, "overheid-certificates.json"),
   quizzes: path.join(DATA_DIR, "overheid-quizzes.json"),
+  "quiz-attempts": path.join(DATA_DIR, "overheid-quiz-attempts.json"),
   handbooks: path.join(DATA_DIR, "overheid-handbooks.json"),
   "service-settings": path.join(DATA_DIR, "overheid-service-settings.json"),
   "training-plans": path.join(DATA_DIR, "overheid-training-plans.json"),
@@ -306,6 +307,45 @@ function normalizeQuiz(body, session, existing = {}) {
   };
 }
 
+function normalizeQuizAttempt(body, session, existing = {}) {
+  const quizTitle = cleanField(body.quizTitle || body.title, 180);
+  if (!quizTitle) throw new Error("Toetsnaam is verplicht.");
+  const now = new Date().toISOString();
+  const score = Number(body.score ?? existing.score ?? 0);
+  const maxScore = Math.max(1, Number(body.maxScore ?? body.max ?? existing.maxScore ?? 100));
+  const percent = Number.isFinite(Number(body.percent)) ? Number(body.percent) : Math.round((score / maxScore) * 100);
+  const passPercent = Number(body.passPercent || existing.passPercent || 90);
+  const passed = body.passed === true || body.passed === "true" || percent >= passPercent;
+  return {
+    id: existing.id || crypto.randomUUID(),
+    service: cleanField(body.service, 80) || "Politie",
+    quizId: cleanField(body.quizId, 120),
+    quizTitle,
+    holderName: cleanField(body.holderName || session.user?.username, 120) || "Amsterdam Roleplay medewerker",
+    discordId: cleanField(body.discordId || session.user?.id, 40),
+    score,
+    maxScore,
+    percent,
+    passPercent,
+    passed,
+    status: cleanField(body.status, 60) || (passed ? "Geslaagd" : "Niet geslaagd"),
+    questionScores: Array.isArray(body.questionScores) ? body.questionScores.map(Number).slice(0, 30) : [],
+    answers: Array.isArray(body.answers)
+      ? body.answers.slice(0, 30).map((item) => ({
+          question: cleanField(item.question, 260),
+          answer: cleanField(item.answer, 800),
+          score: Number(item.score || 0),
+        }))
+      : [],
+    certificateCode: cleanField(body.certificateCode, 100),
+    cooldownUntil: cleanField(body.cooldownUntil, 80),
+    createdAt: existing.createdAt || now,
+    updatedAt: now,
+    createdBy: existing.createdBy || session.user,
+    updatedBy: session.user,
+  };
+}
+
 function normalizeHandbook(body, session, existing = {}) {
   const title = cleanField(body.title, 180);
   const url = cleanField(body.url, 500);
@@ -463,6 +503,27 @@ async function handleIssueCertificate(req, res) {
   return true;
 }
 
+async function handleIssueQuizAttempt(req, res) {
+  const session = requireSession(req, res);
+  if (!session) return true;
+  if (req.method !== "POST") {
+    sendJson(res, 405, { ok: false, message: "Methode niet toegestaan." });
+    return true;
+  }
+  try {
+    const body = await readBody(req);
+    const attempts = await readItems("quiz-attempts");
+    const item = normalizeQuizAttempt(body, session);
+    attempts.push(item);
+    await writeItems("quiz-attempts", attempts);
+    await addLog(session, "Kennistoets poging", item.quizTitle, `${item.percent}% - ${item.status}`);
+    sendJson(res, 201, { ok: true, attempt: item });
+  } catch (error) {
+    sendJson(res, 400, { ok: false, message: error.message });
+  }
+  return true;
+}
+
 async function handleBotIssueCertificate(req, res) {
   if (!requireBotApiKey(req, res)) return true;
   if (req.method !== "POST") {
@@ -611,15 +672,34 @@ async function handlePublicCollection(req, res, type, key) {
   return true;
 }
 
+async function handlePublicQuizzes(req, res) {
+  const items = await readItems("quizzes");
+  sendJson(res, 200, {
+    ok: true,
+    quizzes: sortNewest(items).map((item) => ({
+      id: item.id,
+      title: item.title,
+      service: item.service,
+      rank: item.rank,
+      passPercent: item.passPercent,
+      status: item.status,
+      description: item.description,
+      questionsText: item.status === "Actief" ? item.questionsText : "",
+    })),
+  });
+  return true;
+}
+
 async function handleSummary(req, res) {
   const session = requireAdmin(req, res);
   if (!session) return true;
-  const [dossiers, tasks, applications, certificates, quizzes, handbooks, serviceSettings, trainingPlans, logs] = await Promise.all([
+  const [dossiers, tasks, applications, certificates, quizzes, quizAttempts, handbooks, serviceSettings, trainingPlans, logs] = await Promise.all([
     readItems("dossiers"),
     readItems("tasks"),
     readItems("applications"),
     readItems("certificates"),
     readItems("quizzes"),
+    readItems("quiz-attempts"),
     readItems("handbooks"),
     readItems("service-settings"),
     readItems("training-plans"),
@@ -642,6 +722,8 @@ async function handleSummary(req, res) {
       openApplications: applications.filter((item) => !["Afgekeurd", "Aangenomen", "Gesloten"].includes(item.status)).length,
       certificates: certificates.length,
       quizzes: quizzes.length,
+      quizAttempts: quizAttempts.length,
+      failedQuizAttempts: quizAttempts.filter((item) => !item.passed).length,
       handbooks: handbooks.length,
       serviceSettings: serviceSettings.length,
       trainingPlans: trainingPlans.length,
@@ -653,13 +735,14 @@ async function handleSummary(req, res) {
 }
 
 async function handle(req, res, url) {
+  if (url.pathname === "/api/overheid/quiz-attempts/issue") return handleIssueQuizAttempt(req, res);
   if (url.pathname === "/api/overheid/certificates/issue") return handleIssueCertificate(req, res);
   if (url.pathname === "/api/overheid/certificates/bot-issue") return handleBotIssueCertificate(req, res);
   if (url.pathname === "/api/overheid/certificates/verify" && req.method === "GET") return handleVerifyCertificate(req, res, url);
   if (url.pathname === "/api/overheid/discord/member") return handleDiscordMember(req, res, url);
   if (url.pathname === "/api/overheid/service-settings/public" && req.method === "GET") return handlePublicServiceSettings(req, res);
   if (url.pathname === "/api/overheid/handbooks/public" && req.method === "GET") return handlePublicCollection(req, res, "handbooks", "handbooks");
-  if (url.pathname === "/api/overheid/quizzes/public" && req.method === "GET") return handlePublicCollection(req, res, "quizzes", "quizzes");
+  if (url.pathname === "/api/overheid/quizzes/public" && req.method === "GET") return handlePublicQuizzes(req, res);
   if (url.pathname === "/api/overheid/admin/summary" && req.method === "GET") return handleSummary(req, res);
 
   const collections = [
@@ -668,6 +751,7 @@ async function handle(req, res, url) {
     { path: "/api/overheid/applications", type: "applications", key: "applications", label: "Sollicitatie", title: (item) => item.applicantName, normalize: normalizeApplication },
     { path: "/api/overheid/certificates", type: "certificates", key: "certificates", label: "Certificaat", title: (item) => item.code, normalize: normalizeCertificate },
     { path: "/api/overheid/quizzes", type: "quizzes", key: "quizzes", label: "Kennistoets", title: (item) => item.title, normalize: normalizeQuiz },
+    { path: "/api/overheid/quiz-attempts", type: "quiz-attempts", key: "quizAttempts", label: "Toetspoging", title: (item) => item.quizTitle, normalize: normalizeQuizAttempt },
     { path: "/api/overheid/handbooks", type: "handbooks", key: "handbooks", label: "Handboek", title: (item) => item.title, normalize: normalizeHandbook },
     { path: "/api/overheid/service-settings", type: "service-settings", key: "serviceSettings", label: "Dienstinstelling", title: (item) => item.title, normalize: normalizeServiceSetting },
     { path: "/api/overheid/training-plans", type: "training-plans", key: "trainingPlans", label: "Training", title: (item) => item.title, normalize: normalizeTrainingPlan },

@@ -36,8 +36,8 @@ ul { margin: 12px 0 0; padding-left: 18px; color: var(--muted); }
 .auth-status { margin: 12px auto 0; max-width: 560px; border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; color: var(--muted); background: rgba(255, 255, 255, 0.045); font-size: 0.8rem; font-weight: 800; }
 .auth-status.is-ok { color: var(--green); border-color: rgba(73, 197, 122, 0.35); background: rgba(73, 197, 122, 0.1); }
 .auth-status.is-error { color: var(--red); border-color: rgba(239, 91, 103, 0.35); background: rgba(239, 91, 103, 0.1); }
-.discord-login { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 52px; margin-top: 24px; border-radius: 999px; color: #fff; background: #5865f2; font-weight: 950; box-shadow: 0 12px 30px rgba(88, 101, 242, 0.26); }
-.discord-login:hover { background: #4752c4; }
+.discord-login { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 52px; margin-top: 24px; border-radius: 999px; color: #071016; background: linear-gradient(135deg, var(--cyan), var(--gold)); font-weight: 950; box-shadow: 0 12px 30px rgba(54, 184, 208, 0.24); }
+.discord-login:hover { background: linear-gradient(135deg, #55c9dd, #ffc85d); }
 .login-divider { display: flex; align-items: center; gap: 12px; margin: 16px 0 12px; color: var(--muted); font-size: 0.72rem; font-weight: 950; letter-spacing: 0.12em; text-transform: uppercase; }
 .login-divider::before, .login-divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 .login-services { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
@@ -49,7 +49,7 @@ ul { margin: 12px 0 0; padding-left: 18px; color: var(--muted); }
 .login-service strong { font-size: 0.92rem; line-height: 1.15; }
 .login-service small { color: var(--muted); font-size: 0.7rem; font-weight: 800; }
 .selected-login[hidden] { display: none; }
-.selected-login { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; border: 1px solid rgba(88, 101, 242, 0.32); border-radius: 8px; padding: 10px; background: rgba(88, 101, 242, 0.1); }
+.selected-login { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; border: 1px solid rgba(54, 184, 208, 0.32); border-radius: 8px; padding: 10px; background: linear-gradient(135deg, rgba(54, 184, 208, 0.11), rgba(242, 184, 75, 0.07)); }
 .selected-login span { color: var(--soft); font-size: 0.86rem; font-weight: 900; }
 .discord-login.compact { width: auto; min-width: 220px; min-height: 44px; margin-top: 0; padding: 10px 16px; }
 .login-links { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
@@ -116,14 +116,27 @@ td:first-child { color: var(--text); font-weight: 900; }
 .quiz-card .score { display: inline-flex; margin-top: 10px; border-radius: 999px; padding: 5px 9px; color: var(--green); background: rgba(73, 197, 122, 0.12); font-size: 0.78rem; font-weight: 950; }
 .quiz-card button, .quiz-panel button { min-height: 42px; border: 1px solid transparent; border-radius: 8px; padding: 10px 13px; color: #071016; background: var(--gold); font: inherit; font-weight: 950; cursor: pointer; }
 .quiz-card button { width: 100%; margin-top: 14px; }
+.quiz-card-open { display: grid; gap: 10px; }
+.quiz-card-open.is-passed { border-color: rgba(73, 197, 122, 0.5); background: linear-gradient(135deg, rgba(73, 197, 122, 0.12), rgba(54, 184, 208, 0.05)); }
+.quiz-card-open.is-failed { border-color: rgba(239, 91, 103, 0.42); background: linear-gradient(135deg, rgba(239, 91, 103, 0.12), rgba(16, 24, 33, 0.72)); }
+.quiz-card-open.is-closed { opacity: 0.58; filter: grayscale(0.35); }
+.quiz-card button:disabled { cursor: not-allowed; opacity: 0.55; }
+.quiz-state { display: grid; gap: 2px; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; background: rgba(5, 12, 18, 0.35); }
+.quiz-state strong { color: var(--text); font-size: 0.88rem; }
+.quiz-state span { color: var(--muted); font-size: 0.78rem; font-weight: 800; }
 .quiz-modal { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 18px; background: rgba(0, 0, 0, 0.72); }
 .quiz-modal[hidden] { display: none; }
 .quiz-panel { width: min(760px, 100%); max-height: min(86vh, 900px); overflow: auto; border: 1px solid var(--line-strong); border-radius: 8px; padding: 20px; background: var(--panel); box-shadow: var(--shadow); }
 .modal-close { float: right; color: var(--text) !important; background: rgba(255, 255, 255, 0.05) !important; border-color: var(--line) !important; }
 .quiz-question { margin-top: 16px; border: 1px solid var(--line); border-radius: 8px; padding: 14px; }
+.quiz-intro { margin-top: 14px; border: 1px solid rgba(242, 184, 75, 0.28); border-radius: 8px; padding: 13px; background: rgba(242, 184, 75, 0.08); }
+.open-question textarea { margin-top: 12px; min-height: 128px; }
 .quiz-option { display: block; margin-top: 9px; border: 1px solid var(--line); border-radius: 8px; padding: 10px; color: var(--muted); cursor: pointer; }
 .quiz-option:hover { border-color: var(--line-strong); color: var(--text); }
 .quiz-result { margin-top: 16px; border: 1px solid var(--line-strong); border-radius: 8px; padding: 16px; background: rgba(54, 184, 208, 0.1); text-align: center; }
+.quiz-result ul { display: inline-grid; gap: 5px; margin: 14px auto; text-align: left; }
+.quiz-result.is-valid { border-color: rgba(73, 197, 122, 0.48); background: rgba(73, 197, 122, 0.1); }
+.quiz-result.is-error { border-color: rgba(239, 91, 103, 0.48); background: rgba(239, 91, 103, 0.1); }
 .admin-grid, .admin-module-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; }
 .admin-module-grid { grid-template-columns: minmax(320px, 0.92fr) minmax(0, 1.08fr); gap: 22px; }
 .admin-card { border: 1px solid rgba(54, 184, 208, 0.24); border-radius: 8px; padding: 22px; background: var(--panel-soft); box-shadow: var(--shadow); }
@@ -151,8 +164,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--line-strong); bo
 .record-owner-label { color: var(--muted); font-size: 0.68rem; font-weight: 950; letter-spacing: 0.08em; text-transform: uppercase; }
 .record-owner-name { color: var(--text); font-size: 0.95rem; }
 .discord-tag-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.discord-user-tag { display: inline-flex; align-items: center; gap: 10px; min-width: min(100%, 260px); border: 1px solid rgba(88, 101, 242, 0.38); border-radius: 8px; padding: 8px 10px; color: var(--text); background: linear-gradient(135deg, rgba(88, 101, 242, 0.18), rgba(54, 184, 208, 0.08)); }
-.discord-user-tag:hover { border-color: rgba(88, 101, 242, 0.72); background: rgba(88, 101, 242, 0.2); }
+.discord-user-tag { display: inline-flex; align-items: center; gap: 10px; min-width: min(100%, 260px); border: 1px solid rgba(54, 184, 208, 0.38); border-radius: 8px; padding: 8px 10px; color: var(--text); background: linear-gradient(135deg, rgba(54, 184, 208, 0.18), rgba(242, 184, 75, 0.08)); }
+.discord-user-tag:hover { border-color: rgba(242, 184, 75, 0.72); background: rgba(54, 184, 208, 0.16); }
 .discord-user-tag img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: #0b1016; }
 .discord-user-copy { display: grid; min-width: 0; line-height: 1.15; }
 .discord-user-name { overflow: hidden; color: var(--text); font-size: 0.88rem; text-overflow: ellipsis; white-space: nowrap; }

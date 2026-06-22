@@ -320,6 +320,14 @@ const overheidCollections = {
     body: (item) => item.description || item.questionsText || "Geen beschrijving.",
     closeStatus: "Inactief",
   },
+  quizAttempts: {
+    endpoint: "/api/overheid/quiz-attempts",
+    key: "quizAttempts",
+    title: (item) => item.quizTitle || "Toetspoging",
+    meta: (item) => [item.service, item.status, item.holderName, item.percent + "%", item.certificateCode && "Certificaat: " + item.certificateCode, item.cooldownUntil && "Cooldown: " + formatDate(item.cooldownUntil)].filter(Boolean),
+    body: (item) => (item.answers || []).map((answer, index) => (index + 1) + ". " + answer.question + " (" + answer.score + "%)").join("\n") || "Geen antwoorddetails.",
+    closeStatus: "Gesloten",
+  },
   handbooks: {
     endpoint: "/api/overheid/handbooks",
     key: "handbooks",
@@ -430,6 +438,7 @@ async function loadOverheidSummary() {
       ["Sollicitaties", data.counts.openApplications],
       ["Certificaten", data.counts.certificates],
       ["Toetsen", data.counts.quizzes],
+      ["Pogingen", data.counts.quizAttempts],
       ["Handboeken", data.counts.handbooks],
       ["Trainingen", data.counts.trainingPlans],
     ].forEach(([label, value]) => {
@@ -526,7 +535,280 @@ async function initOverheidAdminPanel() {
   await loadOverheidSummary();
 }
 
+function initOpenAnswerQuizzes() {
+  const dataEl = document.querySelector("#quiz-data");
+  const list = document.querySelector("[data-quiz-list]");
+  const modal = document.querySelector("[data-quiz-modal]");
+  if (!list || !modal) return;
+
+  const titleEl = document.querySelector("[data-quiz-title]");
+  const questionsEl = document.querySelector("[data-quiz-questions]");
+  const closeButton = document.querySelector("[data-quiz-close]");
+  const storageKey = "amrp-politie-open-toets-scores";
+  const cooldownMs = 12 * 60 * 60 * 1000;
+  let quizzes = Array.isArray(window.AMRP_POLICE_QUIZZES) ? window.AMRP_POLICE_QUIZZES.slice() : [];
+  let activeSession = null;
+
+  if (!quizzes.length && dataEl) {
+    try {
+      quizzes = JSON.parse(dataEl.textContent || "[]");
+    } catch {
+      quizzes = [];
+    }
+  }
+
+  function getAttempts() {
+    try {
+      return JSON.parse(localStorage.getItem(storageKey) || "{}");
+    } catch {
+      return {};
+    }
+  }
+
+  function saveAttempt(id, attempt) {
+    const attempts = getAttempts();
+    attempts[id] = { ...attempt, savedAt: new Date().toISOString() };
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(attempts));
+    } catch {}
+  }
+
+  function normaliseerAntwoord(value) {
+    return String(value || "")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9\s-]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function bevatEenVan(text, woorden) {
+    return woorden.some((woord) => text.includes(normaliseerAntwoord(woord)));
+  }
+
+  function telRubricGroepen(text, groepen) {
+    return groepen.reduce((totaal, groep) => totaal + (bevatEenVan(text, groep) ? 1 : 0), 0);
+  }
+
+  function isLeegOfOnserieus(text) {
+    return !text || ["idk", "weet niet", "geen idee", "nvt", "n.v.t", "-", "nee", "ja", "ok", "test"].includes(text);
+  }
+
+  function scoreOpenAntwoord(antwoord, question) {
+    const text = normaliseerAntwoord(antwoord);
+    if (isLeegOfOnserieus(text)) return 0;
+    const groepen = Array.isArray(question.criteria) && question.criteria.length ? question.criteria : [["veiligheid"], ["procedure"], ["communicatie"], ["voorbeeld"]];
+    const hits = telRubricGroepen(text, groepen);
+    let ratio = hits / groepen.length;
+    if (bevatEenVan(text, ["eerst", "daarna", "stap", "omdat", "bijvoorbeeld", "vervolgens"])) ratio += 0.08;
+    if (hits <= 1) ratio *= 0.55;
+    if (text.split(" ").length < 8) ratio = Math.min(ratio, 0.35);
+    return Math.round(Math.max(0, Math.min(1, ratio)) * 100);
+  }
+
+  function shuffle(items) {
+    const next = items.slice();
+    for (let i = next.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [next[i], next[j]] = [next[j], next[i]];
+    }
+    return next;
+  }
+
+  function parseManagedQuestions(text) {
+    return String(text || "")
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const parts = line.split("|").map((part) => part.trim()).filter(Boolean);
+        return { text: parts[0] || line, criteria: parts.slice(1).map((part) => part.split(",").map((word) => word.trim()).filter(Boolean)).filter(Boolean) };
+      });
+  }
+
+  function statusForQuiz(quiz, attempt) {
+    if (String(quiz.status || "Actief").toLowerCase() !== "actief") return { label: "Gesloten", className: "is-closed" };
+    if (!attempt) return { label: "Nog niet gemaakt", className: "" };
+    if (attempt.certificate?.code) return { label: "Certificaat beschikbaar", className: "is-passed" };
+    if (attempt.passed) return { label: "Geslaagd", className: "is-passed" };
+    if (attempt.cooldownUntil && new Date(attempt.cooldownUntil).getTime() > Date.now()) return { label: "Niet geslaagd - cooldown", className: "is-failed" };
+    return { label: "Niet geslaagd", className: "is-failed" };
+  }
+
+  function renderList() {
+    const attempts = getAttempts();
+    list.innerHTML = quizzes.map((quiz) => {
+      const attempt = attempts[quiz.id];
+      const state = statusForQuiz(quiz, attempt);
+      const locked = state.className === "is-closed" || (attempt?.cooldownUntil && new Date(attempt.cooldownUntil).getTime() > Date.now() && !attempt.passed);
+      const scoreLine = attempt ? "Laatste score: " + attempt.score + "% / slagen vanaf " + (quiz.passPercent || 90) + "%" : "Slagen vanaf " + (quiz.passPercent || 90) + "%";
+      const certLink = attempt?.certificate?.code ? '<a class="mini-button" href="../verify.html?code=' + encodeURIComponent(attempt.certificate.code) + '">Certificaat</a>' : "";
+      return '<article class="quiz-card quiz-card-open ' + state.className + '">' +
+        '<span class="service-meta">' + escapeHtml(quiz.rank || quiz.service || "Politie") + '</span>' +
+        '<h3>' + escapeHtml(quiz.title) + '</h3>' +
+        '<p>' + escapeHtml(quiz.description || "Kennistoets volgens de Discord bot.") + '</p>' +
+        '<div class="quiz-state"><strong>' + escapeHtml(state.label) + '</strong><span>' + escapeHtml(scoreLine) + '</span></div>' +
+        '<div class="record-actions">' + certLink + '<button type="button" data-open-quiz="' + escapeHtml(quiz.id) + '"' + (locked ? " disabled" : "") + '>' + (attempt ? "Opnieuw proberen" : "Start toets") + '</button></div>' +
+      '</article>';
+    }).join("");
+  }
+
+  function openQuiz(id) {
+    const quiz = quizzes.find((item) => item.id === id);
+    if (!quiz || String(quiz.status || "Actief").toLowerCase() !== "actief") return;
+    const attempt = getAttempts()[quiz.id];
+    if (attempt?.cooldownUntil && new Date(attempt.cooldownUntil).getTime() > Date.now() && !attempt.passed) return;
+
+    activeSession = {
+      quiz,
+      questions: shuffle((quiz.questions || []).map((question, index) => ({ ...question, originalIndex: index }))),
+    };
+    titleEl.textContent = quiz.title + " - Kennistoets";
+    questionsEl.innerHTML = '<div class="quiz-intro"><strong>Open vragen</strong><p>Beantwoord inhoudelijk. De volgorde wordt willekeurig gezet en de score gebruikt dezelfde criteria als de Discord bot.</p></div>' +
+      activeSession.questions.map((question, index) =>
+        '<div class="quiz-question open-question"><strong>' + (index + 1) + '. ' + escapeHtml(question.text) + '</strong><textarea name="q' + index + '" rows="5" placeholder="Geef een volledig antwoord met stappen, voorbeelden en procedures."></textarea></div>'
+      ).join("") +
+      '<button type="button" data-submit-quiz>Toets indienen</button>';
+    modal.removeAttribute("hidden");
+  }
+
+  async function issueCertificate(quiz, score) {
+    if (window.location.protocol === "file:") return null;
+    const response = await fetchOverheidJson("/api/overheid/certificates/issue", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        service: quiz.service || "Politie",
+        quizTitle: quiz.title,
+        score,
+        maxScore: 100,
+        passPercent: quiz.passPercent || 90,
+      }),
+    });
+    if (!response.ok) throw new Error(response.message || "Certificaat kon niet worden opgeslagen.");
+    return response.certificate;
+  }
+
+  async function logAttempt(quiz, attempt) {
+    if (window.location.protocol === "file:") return null;
+    return fetchOverheidJson("/api/overheid/quiz-attempts/issue", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        service: quiz.service || "Politie",
+        quizId: quiz.id,
+        quizTitle: quiz.title,
+        score: attempt.score,
+        maxScore: 100,
+        percent: attempt.score,
+        passPercent: quiz.passPercent || 90,
+        passed: attempt.passed,
+        status: attempt.passed ? "Geslaagd" : "Niet geslaagd",
+        questionScores: attempt.questionScores,
+        answers: attempt.answers,
+        certificateCode: attempt.certificate?.code || "",
+        cooldownUntil: attempt.cooldownUntil || "",
+      }),
+    }).catch(() => null);
+  }
+
+  async function submitQuiz() {
+    if (!activeSession) return;
+    const { quiz, questions } = activeSession;
+    const answers = questions.map((question, index) => {
+      const answer = questionsEl.querySelector('textarea[name="q' + index + '"]')?.value || "";
+      const score = scoreOpenAntwoord(answer, question);
+      return { question: question.text, answer, score };
+    });
+    const questionScores = answers.map((answer) => answer.score);
+    const score = Math.round(questionScores.reduce((sum, item) => sum + item, 0) / Math.max(1, questionScores.length));
+    const passed = score >= (quiz.passPercent || 90);
+    const cooldownUntil = passed ? "" : new Date(Date.now() + cooldownMs).toISOString();
+    let certificate = null;
+
+    questionsEl.innerHTML = '<div class="quiz-result"><h3>Score: ' + score + '%</h3><p>' + (passed ? "Geslaagd. Certificaat opslaan..." : "Niet geslaagd. Poging opslaan...") + '</p></div>';
+    if (passed) {
+      try {
+        certificate = await issueCertificate(quiz, score);
+      } catch (error) {
+        questionsEl.innerHTML = '<div class="quiz-result is-error"><h3>Score: ' + score + '%</h3><p>Geslaagd, maar certificaat opslaan mislukte: ' + escapeHtml(error.message || "probeer opnieuw") + '</p></div>';
+        return;
+      }
+    }
+
+    const attempt = { score, passed, questionScores, answers, certificate, cooldownUntil };
+    saveAttempt(quiz.id, attempt);
+    await logAttempt(quiz, attempt);
+    const detail = answers.map((answer, index) => '<li>Vraag ' + (index + 1) + ': ' + answer.score + '% inhoudelijk correct</li>').join("");
+    questionsEl.innerHTML = '<div class="quiz-result ' + (passed ? "is-valid" : "is-error") + '"><h3>Score: ' + score + '%</h3>' +
+      '<p>Slagingsgrens: ' + (quiz.passPercent || 90) + '%</p><ul>' + detail + '</ul>' +
+      (passed && certificate ? '<p>Certificaatcode: <strong>' + escapeHtml(certificate.code) + '</strong></p><div class="record-actions"><a class="button secondary" href="../verify.html?code=' + encodeURIComponent(certificate.code) + '">Verifieer certificaat</a><button type="button" data-download-cert>Download certificaat</button></div>' : '<p>Je kunt opnieuw proberen na de cooldown. Lees eerst het handboek opnieuw.</p>') +
+      '</div>';
+    renderList();
+  }
+
+  async function loadManagedQuizzes() {
+    if (window.location.protocol === "file:") return;
+    try {
+      const response = await fetchOverheidJson("/api/overheid/quizzes/public");
+      (response.quizzes || []).forEach((managed) => {
+        const title = String(managed.title || "").toLowerCase();
+        const index = quizzes.findIndex((quiz) => quiz.title.toLowerCase() === title);
+        const questions = parseManagedQuestions(managed.questionsText);
+        const next = {
+          id: managed.id || (title || "toets").replace(/[^a-z0-9]+/g, "-"),
+          title: managed.title,
+          rank: managed.rank || managed.service || "Overheid",
+          service: managed.service || "Politie",
+          passPercent: managed.passPercent || 90,
+          status: managed.status || "Actief",
+          description: managed.description || "Toegevoegd via beheer.",
+          questions,
+        };
+        if (index >= 0) {
+          quizzes[index] = { ...quizzes[index], ...next, questions: questions.length ? questions : quizzes[index].questions };
+        } else if (questions.length) {
+          quizzes.push(next);
+        }
+      });
+      renderList();
+    } catch {
+      // Statische bottoetsen blijven bruikbaar.
+    }
+  }
+
+  list.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-open-quiz]");
+    if (button && !button.disabled) openQuiz(button.dataset.openQuiz);
+  });
+
+  questionsEl.addEventListener("click", (event) => {
+    if (event.target.closest("[data-submit-quiz]")) submitQuiz();
+    if (event.target.closest("[data-download-cert]") && activeSession) {
+      const certificate = getAttempts()[activeSession.quiz.id]?.certificate;
+      if (certificate) downloadVerifiedCertificate(certificate);
+    }
+  });
+
+  closeButton?.addEventListener("click", () => {
+    modal.setAttribute("hidden", "");
+    activeSession = null;
+  });
+
+  modal.addEventListener("click", (event) => {
+    if (event.target === modal) {
+      modal.setAttribute("hidden", "");
+      activeSession = null;
+    }
+  });
+
+  renderList();
+  loadManagedQuizzes();
+}
+
 function initQuizzes() {
+  return initOpenAnswerQuizzes();
   const dataEl = document.querySelector("#quiz-data");
   const list = document.querySelector("[data-quiz-list]");
   const modal = document.querySelector("[data-quiz-modal]");
@@ -676,7 +958,7 @@ function initQuizzes() {
     const certificateId = score.certificate?.code || "AMRP-" + activeQuiz.id.toUpperCase().slice(0, 4) + "-" + new Date().toISOString().slice(0, 10).replace(/-/g, "") + "-" + score.score + score.max;
     const logoUrl = new URL("../assets/logo-amsterdam-roleplay.png", window.location.href).href;
     const html = '<!DOCTYPE html><html lang="nl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Certificaat - ' + activeQuiz.title + '</title><style>' +
-      '@page{size:A4 landscape;margin:0}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#d8e2ea;font-family:Inter,Segoe UI,Arial,sans-serif;color:#10202a}.page{width:1123px;min-height:794px;padding:38px;background:linear-gradient(135deg,#f8fbfd,#edf5f8);position:relative;overflow:hidden}.page:before{content:"";position:absolute;inset:22px;border:2px solid #1b8da7}.page:after{content:"";position:absolute;inset:34px;border:1px solid rgba(16,32,42,.18)}.watermark{position:absolute;right:-80px;bottom:-110px;font-size:210px;font-weight:900;color:rgba(27,141,167,.055);letter-spacing:-8px}.cert{position:relative;z-index:1;min-height:718px;padding:42px 58px;border:1px solid rgba(16,32,42,.12);background:rgba(255,255,255,.82);display:grid;grid-template-rows:auto 1fr auto}.top{display:flex;justify-content:space-between;align-items:flex-start;gap:28px}.brand{display:flex;gap:16px;align-items:center}.logo{width:76px;height:76px;border-radius:18px;object-fit:contain;background:#101821;padding:8px}.brand h1{margin:0;font-size:26px;letter-spacing:.04em;text-transform:uppercase}.brand p,.meta p,.footer p{margin:4px 0 0;color:#597080;font-size:13px}.meta{text-align:right}.meta strong{display:block;font-size:13px;text-transform:uppercase;letter-spacing:.16em;color:#1b8da7}.center{text-align:center;align-self:center}.kicker{margin:0 0 12px;color:#b4872d;font-size:14px;font-weight:900;letter-spacing:.22em;text-transform:uppercase}.title{margin:0;font-family:Georgia,serif;font-size:58px;line-height:1;color:#10202a}.subtitle{margin:14px auto 0;max-width:720px;color:#506878;font-size:18px}.name{display:inline-block;margin-top:34px;padding:8px 34px;border-bottom:2px solid #1b8da7;font-family:Georgia,serif;font-size:42px;font-weight:700;color:#0b1720}.training{margin:26px auto 0;padding:18px 26px;width:min(720px,100%);border:1px solid rgba(27,141,167,.35);background:linear-gradient(135deg,rgba(27,141,167,.08),rgba(180,135,45,.08));border-radius:14px}.training span{display:block;color:#597080;font-size:12px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}.training strong{display:block;margin-top:5px;font-size:25px}.score-row{display:flex;justify-content:center;gap:14px;margin-top:22px}.score{min-width:135px;border-radius:12px;padding:12px 16px;background:#10202a;color:white}.score span{display:block;font-size:11px;color:#a7c9d4;text-transform:uppercase;font-weight:900;letter-spacing:.12em}.score strong{display:block;margin-top:4px;font-size:22px}.bottom{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;align-items:end}.signature{border-top:1px solid #708997;padding-top:10px;text-align:center}.signature strong{display:block}.signature span{color:#597080;font-size:12px}.seal{justify-self:center;display:grid;place-items:center;width:116px;height:116px;border-radius:50%;border:2px solid #1b8da7;color:#1b8da7;font-weight:900;text-align:center;text-transform:uppercase;font-size:12px;letter-spacing:.08em}.print{position:fixed;right:18px;top:18px;border:0;border-radius:999px;background:#10202a;color:white;padding:12px 18px;font-weight:800;cursor:pointer}@media print{body{background:white}.page{width:100vw;min-height:100vh}.print{display:none}}@media(max-width:900px){body{display:block}.page{width:100%;min-height:100vh}.title{font-size:42px}.bottom{grid-template-columns:1fr}.meta{text-align:left}.top{flex-direction:column}.seal{justify-self:start}}' +
+      '@page{size:A4 landscape;margin:0}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#d8e2ea;font-family:Inter,Segoe UI,Arial,sans-serif;color:#10202a}.page{width:1123px;min-height:794px;padding:38px;background:linear-gradient(135deg,#f8fbfd,#edf5f8);position:relative;overflow:hidden}.page:before{content:"";position:absolute;inset:22px;border:2px solid #1b8da7}.page:after{content:"";position:absolute;inset:34px;border:1px solid rgba(16,32,42,.18)}.watermark{position:absolute;right:-80px;bottom:-110px;font-size:210px;font-weight:900;color:rgba(27,141,167,.055);letter-spacing:-8px}.cert{position:relative;z-index:1;min-height:718px;padding:42px 58px;border:1px solid rgba(16,32,42,.12);background:rgba(255,255,255,.82);display:grid;grid-template-rows:auto 1fr auto}.top{display:flex;justify-content:space-between;align-items:flex-start;gap:28px}.brand{display:flex;gap:16px;align-items:center}.logo{width:76px;height:76px;border-radius:18px;object-fit:contain;background:#101821;padding:8px}.brand h1{margin:0;font-size:26px;letter-spacing:.04em;text-transform:uppercase}.brand p,.meta p,.footer p{margin:4px 0 0;color:#597080;font-size:13px}.meta{text-align:right}.meta strong{display:block;font-size:13px;text-transform:uppercase;letter-spacing:.16em;color:#1b8da7}.center{text-align:center;align-self:center}.kicker{margin:0 0 12px;color:#b4872d;font-size:14px;font-weight:900;letter-spacing:.22em;text-transform:uppercase}.title{margin:0;font-family:Georgia,serif;font-size:58px;line-height:1;color:#10202a}.subtitle{margin:14px auto 0;max-width:720px;color:#506878;font-size:18px}.name{display:inline-block;margin-top:34px;padding:8px 34px;border-bottom:2px solid #1b8da7;font-family:Georgia,serif;font-size:42px;font-weight:700;color:#0b1720}.training{margin:26px auto 0;padding:18px 26px;width:min(720px,100%);border:1px solid rgba(27,141,167,.35);background:linear-gradient(135deg,rgba(27,141,167,.08),rgba(180,135,45,.08));border-radius:14px}.training span{display:block;color:#597080;font-size:12px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}.training strong{display:block;margin-top:5px;font-size:25px}.score-row{display:flex;justify-content:center;gap:14px;margin-top:22px}.score{min-width:135px;border-radius:12px;padding:12px 16px;background:#10202a;color:white}.score span{display:block;font-size:11px;color:#a7c9d4;text-transform:uppercase;font-weight:900;letter-spacing:.12em}.score strong{display:block;margin-top:4px;font-size:22px}.bottom{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;align-items:end}.signature{border-top:1px solid #708997;padding-top:10px;text-align:center}.signature strong{display:block}.signature span{color:#597080;font-size:12px}.seal{justify-self:center;display:grid;place-items:center;width:116px;height:116px;border-radius:50%;border:2px solid #1b8da7;color:#1b8da7;font-weight:900;text-align:center;text-transform:uppercase;font-size:12px;letter-spacing:.08em}.qr{justify-self:center;text-align:center;color:#597080;font-size:11px;font-weight:800}.qr img{display:block;width:92px;height:92px;margin:0 auto 6px;border:6px solid white;box-shadow:0 8px 18px rgba(16,32,42,.12)}.print{position:fixed;right:18px;top:18px;border:0;border-radius:999px;background:#10202a;color:white;padding:12px 18px;font-weight:800;cursor:pointer}@media print{body{background:white}.page{width:100vw;min-height:100vh}.print{display:none}}@media(max-width:900px){body{display:block}.page{width:100%;min-height:100vh}.title{font-size:42px}.bottom{grid-template-columns:1fr}.meta{text-align:left}.top{flex-direction:column}.seal{justify-self:start}}' +
       '</style></head><body><button class="print" onclick="window.print()">Print / PDF</button><main class="page"><div class="watermark">AMRP</div><section class="cert"><div class="top"><div class="brand"><img class="logo" src="' + logoUrl + '" alt=""><div><h1>Amsterdam Roleplay</h1><p>Politie Opleidingen & Kennistoetsen</p></div></div><div class="meta"><strong>Certificaatnummer</strong><p>' + certificateId + '</p><p>Uitgegeven op ' + date + '</p></div></div><div class="center"><p class="kicker">Certificaat van voldoening</p><h2 class="title">Officieel Trainingscertificaat</h2><p class="subtitle">Hierbij wordt verklaard dat onderstaande medewerker de kennistoets succesvol heeft afgerond volgens de opleidingsnorm van Amsterdam Roleplay.</p><div class="name">' + name + '</div><div class="training"><span>Afgeronde kennistoets</span><strong>' + activeQuiz.title + '</strong></div><div class="score-row"><div class="score"><span>Score</span><strong>' + score.score + '/' + score.max + '</strong></div><div class="score"><span>Resultaat</span><strong>' + percent + '%</strong></div><div class="score"><span>Status</span><strong>Geslaagd</strong></div></div></div><div class="bottom"><div class="signature"><strong>Korpsleiding</strong><span>Amsterdam Roleplay Politie</span></div><div class="seal">AMRP<br>Certified</div><div class="signature"><strong>Opleidingscoordinator</strong><span>Politie Academie</span></div></div></section></main></body></html>';
     const blob = new Blob([html], { type: "text/html" });
     const link = document.createElement("a");
@@ -766,12 +1048,14 @@ async function verifyCertificateCode(code, root) {
 
 function downloadVerifiedCertificate(cert) {
   if (!cert) return;
-  const logoUrl = new URL("assets/logo-amsterdam-roleplay.png", window.location.href).href;
+  const logoUrl = new URL("/overheid/assets/logo-amsterdam-roleplay.png", window.location.origin).href;
   const issuedAt = cert.issuedAt ? formatDate(cert.issuedAt) : new Date().toLocaleDateString("nl-NL");
+  const verifyUrl = new URL("/overheid/verify.html?code=" + encodeURIComponent(cert.code || ""), window.location.origin).href;
+  const qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=132x132&data=" + encodeURIComponent(verifyUrl);
   const filename = "certificaat-" + String(cert.code || "amrp").toLowerCase().replace(/[^a-z0-9-]+/g, "-") + ".html";
   const html = '<!DOCTYPE html><html lang="nl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Certificaat - ' + escapeHtml(cert.code) + '</title><style>' +
-    '@page{size:A4 landscape;margin:0}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#d9e8ef;font-family:Inter,Segoe UI,Arial,sans-serif;color:#10202a}.page{width:1123px;min-height:794px;padding:38px;background:linear-gradient(135deg,#f8fbfd,#edf7fb);position:relative;overflow:hidden}.page:before{content:"";position:absolute;inset:22px;border:2px solid #1b8da7}.page:after{content:"";position:absolute;inset:34px;border:1px solid rgba(16,32,42,.18)}.watermark{position:absolute;right:-80px;bottom:-110px;font-size:210px;font-weight:900;color:rgba(27,141,167,.055);letter-spacing:-8px}.cert{position:relative;z-index:1;min-height:718px;padding:42px 58px;border:1px solid rgba(16,32,42,.12);background:rgba(255,255,255,.84);display:grid;grid-template-rows:auto 1fr auto}.top{display:flex;justify-content:space-between;align-items:flex-start;gap:28px}.brand{display:flex;gap:16px;align-items:center}.logo{width:76px;height:76px;border-radius:18px;object-fit:contain;background:#101821;padding:8px}.brand h1{margin:0;font-size:26px;letter-spacing:.04em;text-transform:uppercase}.brand p,.meta p{margin:4px 0 0;color:#597080;font-size:13px}.meta{text-align:right}.meta strong{display:block;font-size:13px;text-transform:uppercase;letter-spacing:.16em;color:#1b8da7}.center{text-align:center;align-self:center}.kicker{margin:0 0 12px;color:#b4872d;font-size:14px;font-weight:900;letter-spacing:.22em;text-transform:uppercase}.title{margin:0;font-family:Georgia,serif;font-size:58px;line-height:1;color:#10202a}.subtitle{margin:14px auto 0;max-width:720px;color:#506878;font-size:18px}.name{display:inline-block;margin-top:34px;padding:8px 34px;border-bottom:2px solid #1b8da7;font-family:Georgia,serif;font-size:42px;font-weight:700;color:#0b1720}.training{margin:26px auto 0;padding:18px 26px;width:min(720px,100%);border:1px solid rgba(27,141,167,.35);background:linear-gradient(135deg,rgba(27,141,167,.08),rgba(180,135,45,.08));border-radius:14px}.training span{display:block;color:#597080;font-size:12px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}.training strong{display:block;margin-top:5px;font-size:25px}.score-row{display:flex;justify-content:center;gap:14px;margin-top:22px}.score{min-width:135px;border-radius:12px;padding:12px 16px;background:#10202a;color:white}.score span{display:block;font-size:11px;color:#a7c9d4;text-transform:uppercase;font-weight:900;letter-spacing:.12em}.score strong{display:block;margin-top:4px;font-size:22px}.bottom{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;align-items:end}.signature{border-top:1px solid #708997;padding-top:10px;text-align:center}.signature strong{display:block}.signature span{color:#597080;font-size:12px}.seal{justify-self:center;display:grid;place-items:center;width:116px;height:116px;border-radius:50%;border:2px solid #1b8da7;color:#1b8da7;font-weight:900;text-align:center;text-transform:uppercase;font-size:12px;letter-spacing:.08em}.print{position:fixed;right:18px;top:18px;border:0;border-radius:999px;background:#10202a;color:white;padding:12px 18px;font-weight:800;cursor:pointer}@media print{body{background:white}.page{width:100vw;min-height:100vh}.print{display:none}}@media(max-width:900px){body{display:block}.page{width:100%;min-height:100vh}.title{font-size:42px}.bottom{grid-template-columns:1fr}.meta{text-align:left}.top{flex-direction:column}.seal{justify-self:start}}' +
-    '</style></head><body><button class="print" onclick="window.print()">Print / PDF</button><main class="page"><div class="watermark">AMRP</div><section class="cert"><div class="top"><div class="brand"><img class="logo" src="' + logoUrl + '" alt=""><div><h1>Amsterdam Roleplay</h1><p>Overheid Opleidingen & Kennistoetsen</p></div></div><div class="meta"><strong>Certificaatnummer</strong><p>' + escapeHtml(cert.code) + '</p><p>Uitgegeven op ' + escapeHtml(issuedAt) + '</p></div></div><div class="center"><p class="kicker">Geverifieerd certificaat</p><h2 class="title">Officieel Trainingscertificaat</h2><p class="subtitle">Hierbij wordt verklaard dat onderstaande medewerker de kennistoets succesvol heeft afgerond volgens de opleidingsnorm van Amsterdam Roleplay.</p><div class="name">' + escapeHtml(cert.holderName) + '</div><div class="training"><span>Afgeronde kennistoets</span><strong>' + escapeHtml(cert.quizTitle) + '</strong></div><div class="score-row"><div class="score"><span>Score</span><strong>' + escapeHtml(cert.score) + '/' + escapeHtml(cert.maxScore) + '</strong></div><div class="score"><span>Resultaat</span><strong>' + escapeHtml(cert.percent) + '%</strong></div><div class="score"><span>Status</span><strong>' + escapeHtml(cert.status) + '</strong></div></div></div><div class="bottom"><div class="signature"><strong>Korpsleiding</strong><span>' + escapeHtml(cert.service || "Amsterdam Roleplay") + '</span></div><div class="seal">AMRP<br>Verified</div><div class="signature"><strong>Opleidingscoordinator</strong><span>Overheid Portaal</span></div></div></section></main></body></html>';
+    '@page{size:A4 landscape;margin:0}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#d9e8ef;font-family:Inter,Segoe UI,Arial,sans-serif;color:#10202a}.page{width:1123px;min-height:794px;padding:38px;background:linear-gradient(135deg,#f8fbfd,#edf7fb);position:relative;overflow:hidden}.page:before{content:"";position:absolute;inset:22px;border:2px solid #1b8da7}.page:after{content:"";position:absolute;inset:34px;border:1px solid rgba(16,32,42,.18)}.watermark{position:absolute;right:-80px;bottom:-110px;font-size:210px;font-weight:900;color:rgba(27,141,167,.055);letter-spacing:-8px}.cert{position:relative;z-index:1;min-height:718px;padding:42px 58px;border:1px solid rgba(16,32,42,.12);background:rgba(255,255,255,.84);display:grid;grid-template-rows:auto 1fr auto}.top{display:flex;justify-content:space-between;align-items:flex-start;gap:28px}.brand{display:flex;gap:16px;align-items:center}.logo{width:76px;height:76px;border-radius:18px;object-fit:contain;background:#101821;padding:8px}.brand h1{margin:0;font-size:26px;letter-spacing:.04em;text-transform:uppercase}.brand p,.meta p{margin:4px 0 0;color:#597080;font-size:13px}.meta{text-align:right}.meta strong{display:block;font-size:13px;text-transform:uppercase;letter-spacing:.16em;color:#1b8da7}.center{text-align:center;align-self:center}.kicker{margin:0 0 12px;color:#b4872d;font-size:14px;font-weight:900;letter-spacing:.22em;text-transform:uppercase}.title{margin:0;font-family:Georgia,serif;font-size:58px;line-height:1;color:#10202a}.subtitle{margin:14px auto 0;max-width:720px;color:#506878;font-size:18px}.name{display:inline-block;margin-top:34px;padding:8px 34px;border-bottom:2px solid #1b8da7;font-family:Georgia,serif;font-size:42px;font-weight:700;color:#0b1720}.training{margin:26px auto 0;padding:18px 26px;width:min(720px,100%);border:1px solid rgba(27,141,167,.35);background:linear-gradient(135deg,rgba(27,141,167,.08),rgba(180,135,45,.08));border-radius:14px}.training span{display:block;color:#597080;font-size:12px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}.training strong{display:block;margin-top:5px;font-size:25px}.score-row{display:flex;justify-content:center;gap:14px;margin-top:22px}.score{min-width:135px;border-radius:12px;padding:12px 16px;background:#10202a;color:white}.score span{display:block;font-size:11px;color:#a7c9d4;text-transform:uppercase;font-weight:900;letter-spacing:.12em}.score strong{display:block;margin-top:4px;font-size:22px}.bottom{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;align-items:end}.signature{border-top:1px solid #708997;padding-top:10px;text-align:center}.signature strong{display:block}.signature span{color:#597080;font-size:12px}.seal{justify-self:center;display:grid;place-items:center;width:116px;height:116px;border-radius:50%;border:2px solid #1b8da7;color:#1b8da7;font-weight:900;text-align:center;text-transform:uppercase;font-size:12px;letter-spacing:.08em}.qr{justify-self:center;text-align:center;color:#597080;font-size:11px;font-weight:800}.qr img{display:block;width:92px;height:92px;margin:0 auto 6px;border:6px solid white;box-shadow:0 8px 18px rgba(16,32,42,.12)}.print{position:fixed;right:18px;top:18px;border:0;border-radius:999px;background:#10202a;color:white;padding:12px 18px;font-weight:800;cursor:pointer}@media print{body{background:white}.page{width:100vw;min-height:100vh}.print{display:none}}@media(max-width:900px){body{display:block}.page{width:100%;min-height:100vh}.title{font-size:42px}.bottom{grid-template-columns:1fr}.meta{text-align:left}.top{flex-direction:column}.seal{justify-self:start}}' +
+    '</style></head><body><button class="print" onclick="window.print()">Print / PDF</button><main class="page"><div class="watermark">AMRP</div><section class="cert"><div class="top"><div class="brand"><img class="logo" src="' + logoUrl + '" alt=""><div><h1>Amsterdam Roleplay</h1><p>Overheid Opleidingen & Kennistoetsen</p></div></div><div class="meta"><strong>Certificaatnummer</strong><p>' + escapeHtml(cert.code) + '</p><p>Uitgegeven op ' + escapeHtml(issuedAt) + '</p></div></div><div class="center"><p class="kicker">Geverifieerd certificaat</p><h2 class="title">Officieel Trainingscertificaat</h2><p class="subtitle">Hierbij wordt verklaard dat onderstaande medewerker de kennistoets succesvol heeft afgerond volgens de opleidingsnorm van Amsterdam Roleplay.</p><div class="name">' + escapeHtml(cert.holderName) + '</div><div class="training"><span>Afgeronde kennistoets</span><strong>' + escapeHtml(cert.quizTitle) + '</strong></div><div class="score-row"><div class="score"><span>Score</span><strong>' + escapeHtml(cert.score) + '/' + escapeHtml(cert.maxScore) + '</strong></div><div class="score"><span>Resultaat</span><strong>' + escapeHtml(cert.percent) + '%</strong></div><div class="score"><span>Status</span><strong>' + escapeHtml(cert.status) + '</strong></div></div></div><div class="bottom"><div class="signature"><strong>Korpsleiding</strong><span>' + escapeHtml(cert.service || "Amsterdam Roleplay") + '</span></div><div class="qr"><img src="' + qrUrl + '" alt="QR verificatie"><span>Scan om te verifieren</span></div><div class="signature"><strong>Opleidingscoordinator</strong><span>Overheid Portaal</span></div></div></section></main></body></html>';
 
   const blob = new Blob([html], { type: "text/html" });
   const link = document.createElement("a");

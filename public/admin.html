@@ -35,7 +35,7 @@
         <div class="metric-grid" data-overheid-summary>
           <div><span>Status</span><strong>Laden</strong></div>
           <div><span>Opslag</span><strong>Supabase</strong></div>
-          <div><span>Modules</span><strong>8</strong></div>
+          <div><span>Modules</span><strong>9</strong></div>
         </div>
       </div>
     </section>
@@ -191,13 +191,25 @@
             <label><span>Status</span><select name="status"><option>Actief</option><option>Concept</option><option>Inactief</option></select></label>
           </div>
           <label><span>Beschrijving</span><textarea name="description" rows="3"></textarea></label>
-          <label><span>Vragen / antwoorden</span><textarea name="questionsText" rows="5" placeholder="Vraag | antwoord A | antwoord B | correct"></textarea></label>
+          <label><span>Open vragen / criteria</span><textarea name="questionsText" rows="5" placeholder="Vraag | criteriagroep 1 woorden | criteriagroep 2 woorden | criteriagroep 3 woorden"></textarea></label>
           <div class="form-actions"><button class="button" type="submit">Toets opslaan</button><span data-overheid-feedback="quizzes"></span></div>
         </form>
         <div class="admin-card">
           <div class="admin-card-title"><span>=</span>Toetsen</div>
           <div class="record-grid" data-overheid-list="quizzes"><p class="empty-text">Toetsen laden...</p></div>
         </div>
+      </div>
+    </section>
+
+    <section class="container section slim">
+      <div class="section-head compact">
+        <p class="eyebrow">Pogingen-log</p>
+        <h2>Wie maakte welke kennistoets</h2>
+      </div>
+      <div class="admin-card">
+        <div class="admin-card-title"><span>=</span>Toetspogingen</div>
+        <p>Elke poging wordt opgeslagen met score, status, certificaatcode en eventuele cooldown.</p>
+        <div class="record-grid" data-overheid-list="quizAttempts"><p class="empty-text">Toetspogingen laden...</p></div>
       </div>
     </section>
 
