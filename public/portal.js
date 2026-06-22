@@ -144,6 +144,15 @@ function recordBadge(text) {
   return textNode("span", "status-badge", text);
 }
 
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 function appendRecordBadges(root, items, prefix) {
   const values = Array.isArray(items) ? items.filter(Boolean) : [];
   values.forEach((item) => root.appendChild(recordBadge((prefix || "") + item)));
@@ -649,13 +658,32 @@ async function verifyCertificateCode(code, root) {
     if (!data.ok) throw new Error(data.message || "Certificaat niet gevonden.");
     const cert = data.certificate;
     root.innerHTML = '<article class="record-card certificate-result is-valid">' +
-      '<header><h3>' + cert.code + '</h3><span class="status-badge">' + cert.status + '</span></header>' +
-      '<div class="record-meta"><span class="status-badge">' + cert.service + '</span><span class="status-badge">' + cert.percent + '%</span><span class="status-badge">' + formatDate(cert.issuedAt) + '</span></div>' +
-      '<p><strong>' + cert.holderName + '</strong> is geslaagd voor ' + cert.quizTitle + ' met score ' + cert.score + '/' + cert.maxScore + '.</p>' +
+      '<header><h3>' + escapeHtml(cert.code) + '</h3><span class="status-badge">' + escapeHtml(cert.status) + '</span></header>' +
+      '<div class="record-meta"><span class="status-badge">' + escapeHtml(cert.service) + '</span><span class="status-badge">' + escapeHtml(cert.percent) + '%</span><span class="status-badge">' + escapeHtml(formatDate(cert.issuedAt)) + '</span></div>' +
+      '<p><strong>' + escapeHtml(cert.holderName) + '</strong> is geslaagd voor ' + escapeHtml(cert.quizTitle) + ' met score ' + escapeHtml(cert.score) + '/' + escapeHtml(cert.maxScore) + '.</p>' +
+      '<div class="record-actions"><button type="button" class="button" data-download-verified-cert>Download certificaat</button></div>' +
       '</article>';
+    root.querySelector("[data-download-verified-cert]")?.addEventListener("click", () => downloadVerifiedCertificate(cert));
   } catch (error) {
-    root.innerHTML = '<article class="record-card certificate-result is-invalid"><h3>Niet gevonden</h3><p>' + (error.message || "Controleer de code en probeer opnieuw.") + '</p></article>';
+    root.innerHTML = '<article class="record-card certificate-result is-invalid"><h3>Niet gevonden</h3><p>' + escapeHtml(error.message || "Controleer de code en probeer opnieuw.") + '</p></article>';
   }
+}
+
+function downloadVerifiedCertificate(cert) {
+  if (!cert) return;
+  const logoUrl = new URL("assets/logo-amsterdam-roleplay.png", window.location.href).href;
+  const issuedAt = cert.issuedAt ? formatDate(cert.issuedAt) : new Date().toLocaleDateString("nl-NL");
+  const filename = "certificaat-" + String(cert.code || "amrp").toLowerCase().replace(/[^a-z0-9-]+/g, "-") + ".html";
+  const html = '<!DOCTYPE html><html lang="nl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Certificaat - ' + escapeHtml(cert.code) + '</title><style>' +
+    '@page{size:A4 landscape;margin:0}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#d9e8ef;font-family:Inter,Segoe UI,Arial,sans-serif;color:#10202a}.page{width:1123px;min-height:794px;padding:38px;background:linear-gradient(135deg,#f8fbfd,#edf7fb);position:relative;overflow:hidden}.page:before{content:"";position:absolute;inset:22px;border:2px solid #1b8da7}.page:after{content:"";position:absolute;inset:34px;border:1px solid rgba(16,32,42,.18)}.watermark{position:absolute;right:-80px;bottom:-110px;font-size:210px;font-weight:900;color:rgba(27,141,167,.055);letter-spacing:-8px}.cert{position:relative;z-index:1;min-height:718px;padding:42px 58px;border:1px solid rgba(16,32,42,.12);background:rgba(255,255,255,.84);display:grid;grid-template-rows:auto 1fr auto}.top{display:flex;justify-content:space-between;align-items:flex-start;gap:28px}.brand{display:flex;gap:16px;align-items:center}.logo{width:76px;height:76px;border-radius:18px;object-fit:contain;background:#101821;padding:8px}.brand h1{margin:0;font-size:26px;letter-spacing:.04em;text-transform:uppercase}.brand p,.meta p{margin:4px 0 0;color:#597080;font-size:13px}.meta{text-align:right}.meta strong{display:block;font-size:13px;text-transform:uppercase;letter-spacing:.16em;color:#1b8da7}.center{text-align:center;align-self:center}.kicker{margin:0 0 12px;color:#b4872d;font-size:14px;font-weight:900;letter-spacing:.22em;text-transform:uppercase}.title{margin:0;font-family:Georgia,serif;font-size:58px;line-height:1;color:#10202a}.subtitle{margin:14px auto 0;max-width:720px;color:#506878;font-size:18px}.name{display:inline-block;margin-top:34px;padding:8px 34px;border-bottom:2px solid #1b8da7;font-family:Georgia,serif;font-size:42px;font-weight:700;color:#0b1720}.training{margin:26px auto 0;padding:18px 26px;width:min(720px,100%);border:1px solid rgba(27,141,167,.35);background:linear-gradient(135deg,rgba(27,141,167,.08),rgba(180,135,45,.08));border-radius:14px}.training span{display:block;color:#597080;font-size:12px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}.training strong{display:block;margin-top:5px;font-size:25px}.score-row{display:flex;justify-content:center;gap:14px;margin-top:22px}.score{min-width:135px;border-radius:12px;padding:12px 16px;background:#10202a;color:white}.score span{display:block;font-size:11px;color:#a7c9d4;text-transform:uppercase;font-weight:900;letter-spacing:.12em}.score strong{display:block;margin-top:4px;font-size:22px}.bottom{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;align-items:end}.signature{border-top:1px solid #708997;padding-top:10px;text-align:center}.signature strong{display:block}.signature span{color:#597080;font-size:12px}.seal{justify-self:center;display:grid;place-items:center;width:116px;height:116px;border-radius:50%;border:2px solid #1b8da7;color:#1b8da7;font-weight:900;text-align:center;text-transform:uppercase;font-size:12px;letter-spacing:.08em}.print{position:fixed;right:18px;top:18px;border:0;border-radius:999px;background:#10202a;color:white;padding:12px 18px;font-weight:800;cursor:pointer}@media print{body{background:white}.page{width:100vw;min-height:100vh}.print{display:none}}@media(max-width:900px){body{display:block}.page{width:100%;min-height:100vh}.title{font-size:42px}.bottom{grid-template-columns:1fr}.meta{text-align:left}.top{flex-direction:column}.seal{justify-self:start}}' +
+    '</style></head><body><button class="print" onclick="window.print()">Print / PDF</button><main class="page"><div class="watermark">AMRP</div><section class="cert"><div class="top"><div class="brand"><img class="logo" src="' + logoUrl + '" alt=""><div><h1>Amsterdam Roleplay</h1><p>Overheid Opleidingen & Kennistoetsen</p></div></div><div class="meta"><strong>Certificaatnummer</strong><p>' + escapeHtml(cert.code) + '</p><p>Uitgegeven op ' + escapeHtml(issuedAt) + '</p></div></div><div class="center"><p class="kicker">Geverifieerd certificaat</p><h2 class="title">Officieel Trainingscertificaat</h2><p class="subtitle">Hierbij wordt verklaard dat onderstaande medewerker de kennistoets succesvol heeft afgerond volgens de opleidingsnorm van Amsterdam Roleplay.</p><div class="name">' + escapeHtml(cert.holderName) + '</div><div class="training"><span>Afgeronde kennistoets</span><strong>' + escapeHtml(cert.quizTitle) + '</strong></div><div class="score-row"><div class="score"><span>Score</span><strong>' + escapeHtml(cert.score) + '/' + escapeHtml(cert.maxScore) + '</strong></div><div class="score"><span>Resultaat</span><strong>' + escapeHtml(cert.percent) + '%</strong></div><div class="score"><span>Status</span><strong>' + escapeHtml(cert.status) + '</strong></div></div></div><div class="bottom"><div class="signature"><strong>Korpsleiding</strong><span>' + escapeHtml(cert.service || "Amsterdam Roleplay") + '</span></div><div class="seal">AMRP<br>Verified</div><div class="signature"><strong>Opleidingscoordinator</strong><span>Overheid Portaal</span></div></div></section></main></body></html>';
+
+  const blob = new Blob([html], { type: "text/html" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(link.href);
 }
 
 function initCertificateVerify() {
