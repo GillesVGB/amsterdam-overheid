@@ -153,6 +153,100 @@ function escapeHtml(value) {
     .replace(/'/g, "&#039;");
 }
 
+const discordMemberCache = new Map();
+
+function normalizeDiscordId(value) {
+  return String(value || "").replace(/\D/g, "");
+}
+
+function fallbackDiscordAvatar(id) {
+  try {
+    return "https://cdn.discordapp.com/embed/avatars/" + Number(BigInt(id) % 6n) + ".png";
+  } catch {
+    return "https://cdn.discordapp.com/embed/avatars/0.png";
+  }
+}
+
+async function loadDiscordMember(id) {
+  const discordId = normalizeDiscordId(id);
+  if (!discordId || window.location.protocol === "file:") return null;
+  if (discordMemberCache.has(discordId)) return discordMemberCache.get(discordId);
+
+  const promise = fetchOverheidJson("/api/overheid/discord/member?id=" + encodeURIComponent(discordId))
+    .then((data) => data.ok ? data.member : null)
+    .catch(() => null);
+  discordMemberCache.set(discordId, promise);
+  return promise;
+}
+
+function createDiscordUserTag(item) {
+  const id = normalizeDiscordId(item.discordId);
+  if (!id) return null;
+
+  const wrap = document.createElement("div");
+  wrap.className = "discord-tag-row";
+
+  const tag = document.createElement("a");
+  tag.className = "discord-user-tag";
+  tag.href = "https://discord.com/users/" + encodeURIComponent(id);
+  tag.target = "_blank";
+  tag.rel = "noopener";
+  tag.title = "Open Discord-profiel";
+
+  const avatar = document.createElement("img");
+  avatar.src = fallbackDiscordAvatar(id);
+  avatar.alt = "";
+  tag.appendChild(avatar);
+
+  const copy = document.createElement("span");
+  copy.className = "discord-user-copy";
+  const name = textNode("strong", "discord-user-name", item.holderName || "Discord gebruiker");
+  const handle = textNode("small", "discord-user-handle", "<@" + id + ">");
+  copy.appendChild(name);
+  copy.appendChild(handle);
+  tag.appendChild(copy);
+  wrap.appendChild(tag);
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "mini-button ghost";
+  button.textContent = "Kopieer mention";
+  button.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText("<@" + id + ">");
+      button.textContent = "Gekopieerd";
+      setTimeout(() => { button.textContent = "Kopieer mention"; }, 1400);
+    } catch {
+      button.textContent = "<@" + id + ">";
+    }
+  });
+  wrap.appendChild(button);
+
+  loadDiscordMember(id).then((member) => {
+    if (!member) return;
+    avatar.src = member.avatar || fallbackDiscordAvatar(id);
+    name.textContent = member.name || item.holderName || "Discord gebruiker";
+    handle.textContent = member.username ? "@" + member.username : "<@" + id + ">";
+  });
+
+  return wrap;
+}
+
+function createCertificateOwner(item) {
+  const block = document.createElement("div");
+  block.className = "record-owner";
+  block.appendChild(textNode("span", "record-owner-label", "Gemaakt door"));
+
+  const discordTag = createDiscordUserTag(item);
+  if (discordTag) {
+    block.appendChild(discordTag);
+  } else {
+    block.appendChild(textNode("strong", "record-owner-name", item.holderName || "Onbekend"));
+  }
+
+  return block;
+}
+
 function appendRecordBadges(root, items, prefix) {
   const values = Array.isArray(items) ? items.filter(Boolean) : [];
   values.forEach((item) => root.appendChild(recordBadge((prefix || "") + item)));
@@ -214,7 +308,7 @@ const overheidCollections = {
     endpoint: "/api/overheid/certificates",
     key: "certificates",
     title: (item) => item.code || "Certificaat",
-    meta: (item) => [item.service, item.status, item.holderName, item.percent + "%", item.issuedAt && "Uitgegeven: " + formatDate(item.issuedAt)].filter(Boolean),
+    meta: (item) => [item.service, item.status, item.percent + "%", item.issuedAt && "Uitgegeven: " + formatDate(item.issuedAt)].filter(Boolean),
     body: (item) => [item.quizTitle, item.verifierNotes].filter(Boolean).join("\n\n") || "Geen notities.",
     closeStatus: "Ingetrokken",
   },
@@ -265,6 +359,7 @@ function renderOverheidRecord(type, item) {
   meta.className = "record-meta";
   config.meta(item).forEach((value) => meta.appendChild(recordBadge(value)));
   card.appendChild(meta);
+  if (type === "certificates") card.appendChild(createCertificateOwner(item));
   card.appendChild(textNode("p", "", config.body(item)));
   appendRecordLinks(card, "Bewijslinks", item.evidenceLinks);
   appendRecordNotes(card, item.notes);

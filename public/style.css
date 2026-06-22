@@ -147,9 +147,20 @@ input:focus, select:focus, textarea:focus { border-color: var(--line-strong); bo
 .record-card p { margin-top: 8px; font-size: 0.9rem; }
 .record-meta { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 9px; }
 .status-badge { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 5px 9px; color: var(--soft); background: rgba(54, 184, 208, 0.08); font-size: 0.73rem; font-weight: 950; }
+.record-owner { display: grid; gap: 7px; margin-top: 12px; }
+.record-owner-label { color: var(--muted); font-size: 0.68rem; font-weight: 950; letter-spacing: 0.08em; text-transform: uppercase; }
+.record-owner-name { color: var(--text); font-size: 0.95rem; }
+.discord-tag-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.discord-user-tag { display: inline-flex; align-items: center; gap: 10px; min-width: min(100%, 260px); border: 1px solid rgba(88, 101, 242, 0.38); border-radius: 8px; padding: 8px 10px; color: var(--text); background: linear-gradient(135deg, rgba(88, 101, 242, 0.18), rgba(54, 184, 208, 0.08)); }
+.discord-user-tag:hover { border-color: rgba(88, 101, 242, 0.72); background: rgba(88, 101, 242, 0.2); }
+.discord-user-tag img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: #0b1016; }
+.discord-user-copy { display: grid; min-width: 0; line-height: 1.15; }
+.discord-user-name { overflow: hidden; color: var(--text); font-size: 0.88rem; text-overflow: ellipsis; white-space: nowrap; }
+.discord-user-handle { overflow: hidden; margin-top: 3px; color: var(--muted); font-size: 0.72rem; font-weight: 850; text-overflow: ellipsis; white-space: nowrap; }
 .record-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .mini-button { display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--line); border-radius: 8px; padding: 8px 11px; color: var(--text); background: rgba(54, 184, 208, 0.08); font: inherit; font-size: 0.78rem; font-weight: 950; cursor: pointer; text-decoration: none; }
 .mini-button:hover { border-color: var(--line-strong); background: rgba(54, 184, 208, 0.16); }
+.mini-button.ghost { color: var(--soft); background: rgba(255, 255, 255, 0.035); }
 .mini-button.danger { color: #ffc5ca; border-color: rgba(239, 91, 103, 0.28); }
 .record-link-list, .record-note-list { margin-top: 12px; border: 1px solid var(--line); border-radius: 8px; padding: 11px; background: rgba(54, 184, 208, 0.055); }
 .record-link-list strong, .record-note-list strong { display: block; margin-bottom: 8px; color: var(--text); font-size: 0.82rem; }

@@ -8,6 +8,9 @@ const DATA_DIR = process.env.OVERHEID_DATA_DIR
   : path.resolve(__dirname, "..", "data");
 const APP_NAME = "overheid";
 const BODY_LIMIT = 1024 * 1024;
+const DISCORD_API = "https://discord.com/api/v10";
+const DISCORD_CACHE_TTL_MS = 5 * 60 * 1000;
+const discordMemberCache = new Map();
 
 const files = {
   dossiers: path.join(DATA_DIR, "overheid-dossiers.json"),
@@ -54,6 +57,37 @@ function certificateCode(service = "POL") {
 
 function publicPortalUrl() {
   return String(process.env.OVERHEID_PUBLIC_URL || "").replace(/\/+$/, "");
+}
+
+function discordBotToken() {
+  return String(process.env.OVERHEID_DISCORD_BOT_TOKEN || process.env.DISCORD_BOT_TOKEN || "").trim();
+}
+
+function discordGuildId() {
+  return String(process.env.DISCORD_GUILD_ID || "").trim();
+}
+
+function avatarUrlFromMember(member, guildId) {
+  const user = member.user || {};
+  if (member.avatar && user.id && guildId) {
+    return `https://cdn.discordapp.com/guilds/${guildId}/users/${user.id}/avatars/${member.avatar}.png?size=128`;
+  }
+  if (user.avatar && user.id) {
+    return `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=128`;
+  }
+  if (!user.id) return "https://cdn.discordapp.com/embed/avatars/0.png";
+  const index = Number(BigInt(user.id) % 6n);
+  return `https://cdn.discordapp.com/embed/avatars/${index}.png`;
+}
+
+function publicDiscordMember(member, guildId) {
+  const user = member.user || {};
+  return {
+    id: user.id || "",
+    name: member.nick || user.global_name || user.username || "Onbekende gebruiker",
+    username: user.discriminator && user.discriminator !== "0" ? `${user.username}#${user.discriminator}` : user.username || "",
+    avatar: avatarUrlFromMember(member, guildId),
+  };
 }
 
 function getBearerToken(req) {
@@ -509,6 +543,51 @@ async function handleVerifyCertificate(req, res, url) {
   return true;
 }
 
+async function handleDiscordMember(req, res, url) {
+  const session = requireAdmin(req, res);
+  if (!session) return true;
+
+  if (req.method !== "GET") {
+    sendJson(res, 405, { ok: false, message: "Methode niet toegestaan." });
+    return true;
+  }
+
+  const id = cleanField(url.searchParams.get("id"), 40).replace(/\D/g, "");
+  if (!id) {
+    sendJson(res, 400, { ok: false, message: "Discord ID ontbreekt." });
+    return true;
+  }
+
+  const token = discordBotToken();
+  const guildId = discordGuildId();
+  if (!token || !guildId) {
+    sendJson(res, 503, { ok: false, message: "Discord bot-token of guild ID ontbreekt in Render." });
+    return true;
+  }
+
+  const cached = discordMemberCache.get(id);
+  if (cached && cached.expiresAt > Date.now()) {
+    sendJson(res, 200, { ok: true, member: cached.member, cached: true });
+    return true;
+  }
+
+  try {
+    const response = await fetch(`${DISCORD_API}/guilds/${guildId}/members/${id}`, {
+      headers: { Authorization: `Bot ${token}` },
+    });
+    if (!response.ok) {
+      sendJson(res, response.status === 404 ? 404 : 502, { ok: false, message: "Discord gebruiker kon niet geladen worden." });
+      return true;
+    }
+    const member = publicDiscordMember(await response.json(), guildId);
+    discordMemberCache.set(id, { member, expiresAt: Date.now() + DISCORD_CACHE_TTL_MS });
+    sendJson(res, 200, { ok: true, member });
+  } catch {
+    sendJson(res, 502, { ok: false, message: "Discord API niet bereikbaar." });
+  }
+  return true;
+}
+
 async function handlePublicServiceSettings(req, res) {
   const settings = await readItems("service-settings");
   sendJson(res, 200, {
@@ -577,6 +656,7 @@ async function handle(req, res, url) {
   if (url.pathname === "/api/overheid/certificates/issue") return handleIssueCertificate(req, res);
   if (url.pathname === "/api/overheid/certificates/bot-issue") return handleBotIssueCertificate(req, res);
   if (url.pathname === "/api/overheid/certificates/verify" && req.method === "GET") return handleVerifyCertificate(req, res, url);
+  if (url.pathname === "/api/overheid/discord/member") return handleDiscordMember(req, res, url);
   if (url.pathname === "/api/overheid/service-settings/public" && req.method === "GET") return handlePublicServiceSettings(req, res);
   if (url.pathname === "/api/overheid/handbooks/public" && req.method === "GET") return handlePublicCollection(req, res, "handbooks", "handbooks");
   if (url.pathname === "/api/overheid/quizzes/public" && req.method === "GET") return handlePublicCollection(req, res, "quizzes", "quizzes");
