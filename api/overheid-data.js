@@ -22,6 +22,7 @@ const files = {
   handbooks: path.join(DATA_DIR, "overheid-handbooks.json"),
   "service-settings": path.join(DATA_DIR, "overheid-service-settings.json"),
   "training-plans": path.join(DATA_DIR, "overheid-training-plans.json"),
+  "vog-requests": path.join(DATA_DIR, "overheid-vog-requests.json"),
   logs: path.join(DATA_DIR, "overheid-logs.json"),
 };
 
@@ -66,6 +67,14 @@ function discordBotToken() {
 
 function discordGuildId() {
   return String(process.env.DISCORD_GUILD_ID || "").trim();
+}
+
+function vogChannelId() {
+  return String(process.env.VOG_KANAAL_ID || "1513290970668466329").trim();
+}
+
+function vogReviewRoleId() {
+  return String(process.env.VOG_REVIEW_ROLE_ID || process.env.ALLOWED_ROLE_ID || "1504849453268598875").trim();
 }
 
 function avatarUrlFromMember(member, guildId) {
@@ -405,6 +414,182 @@ function normalizeTrainingPlan(body, session, existing = {}) {
   };
 }
 
+function hasMeaningfulReason(reason) {
+  const value = cleanField(reason, 900).toLowerCase();
+  const words = value
+    .replace(/[^a-z0-9À-ÿ\s-]/gi, " ")
+    .split(/\s+/)
+    .map((word) => word.trim())
+    .filter((word) => word.length >= 3);
+  if (words.length < 5) return false;
+  if (/^(test|asdf|geen idee|idk|nvt|nee|ja)[\s.!?]*$/i.test(value)) return false;
+  return true;
+}
+
+function normalizeVogRequest(body, session) {
+  const reason = cleanField(body.reason, 900);
+  const criminalRecord = cleanField(body.criminalRecord, 40).toLowerCase();
+  const criminalDetails = cleanField(body.criminalDetails, 900);
+  if (!reason) throw new Error("Reden van aanvraag is verplicht.");
+  if (!criminalRecord) throw new Error("Kies of je een strafblad hebt.");
+  if (!hasMeaningfulReason(reason)) throw new Error("Geef een duidelijkere reden voor je VOG aanvraag.");
+
+  return {
+    status: "pending",
+    datum: new Date().toLocaleString("nl-NL"),
+    volledige_naam: session.user?.username || "Discord gebruiker",
+    geboortedatum: "Ingediend via website",
+    reden_aanvraag: reason,
+    strafblad: criminalRecord === "nee" ? "Geen" : (criminalDetails || "Ja"),
+    datum_aanvraag: new Date().toISOString(),
+    bron: "website",
+  };
+}
+
+function supabaseConfig() {
+  return {
+    url: String(process.env.SUPABASE_URL || "").replace(/\/+$/, ""),
+    key: process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || "",
+  };
+}
+
+async function supabaseVogRequest(method, query, body, extraHeaders = {}) {
+  const config = supabaseConfig();
+  if (!config.url || !config.key) throw new Error("Supabase mist in Render.");
+  const headers = {
+    apikey: config.key,
+    "Content-Type": "application/json",
+    ...extraHeaders,
+  };
+  if (!config.key.startsWith("sb_secret_") && !config.key.startsWith("sb_publishable_")) {
+    headers.Authorization = `Bearer ${config.key}`;
+  }
+  const response = await fetch(`${config.url}/rest/v1/vog_aanvragen${query}`, {
+    method,
+    headers,
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const text = await response.text();
+  const payload = text ? JSON.parse(text) : null;
+  if (!response.ok) throw new Error(payload?.message || payload?.error || "Supabase VOG aanvraag mislukt.");
+  return payload;
+}
+
+async function readVogRequest(userId) {
+  if (!store.isConfigured()) {
+    const items = await readItems("vog-requests");
+    return items.find((item) => item.user_id === userId) || null;
+  }
+  const rows = await supabaseVogRequest("GET", `?user_id=eq.${encodeURIComponent(userId)}&select=*&limit=1`);
+  return Array.isArray(rows) ? rows[0] || null : null;
+}
+
+async function readVogRequests() {
+  if (!store.isConfigured()) return readItems("vog-requests");
+  const rows = await supabaseVogRequest("GET", "?select=*&order=datum_aanvraag.desc");
+  return Array.isArray(rows) ? rows : [];
+}
+
+async function writeVogRequest(userId, payload) {
+  if (!store.isConfigured()) {
+    const items = await readItems("vog-requests");
+    const next = items.filter((item) => item.user_id !== userId);
+    next.push({ user_id: userId, ...payload });
+    await writeItems("vog-requests", next);
+    return next.find((item) => item.user_id === userId);
+  }
+  const existing = await readVogRequest(userId);
+  if (existing) {
+    const rows = await supabaseVogRequest("PATCH", `?user_id=eq.${encodeURIComponent(userId)}`, payload, { Prefer: "return=representation" });
+    return Array.isArray(rows) ? rows[0] || { user_id: userId, ...payload } : { user_id: userId, ...payload };
+  }
+  const rows = await supabaseVogRequest("POST", "", [{ user_id: userId, ...payload }], { Prefer: "return=representation" });
+  return Array.isArray(rows) ? rows[0] || { user_id: userId, ...payload } : { user_id: userId, ...payload };
+}
+
+async function notifyVogRequest(session, item) {
+  const token = discordBotToken();
+  const channelId = vogChannelId();
+  if (!token || !channelId) return "Geen Discord melding verstuurd: bot-token of VOG kanaal mist.";
+
+  const reviewerRole = vogReviewRoleId();
+  const mention = reviewerRole ? `<@&${reviewerRole}>` : "";
+  const response = await fetch(`${DISCORD_API}/channels/${channelId}/messages`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bot ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      content: mention,
+      embeds: [{
+        title: "NIEUWE VOG AANVRAAG - WEBSITE",
+        color: 0xf2b84b,
+        description: `Aanvrager: <@${session.user?.id}> (${session.user?.id})\nBron: Overheid website`,
+        fields: [
+          { name: "Naam", value: cleanField(item.volledige_naam, 900) || "Onbekend", inline: false },
+          { name: "Reden van aanvraag", value: cleanField(item.reden_aanvraag, 900) || "Geen reden", inline: false },
+          { name: "Strafblad", value: cleanField(item.strafblad, 900) || "Onbekend", inline: false },
+          { name: "Actie", value: `/vog goedkeuren ${session.user?.id} of /vog afwijzen ${session.user?.id}`, inline: false },
+        ],
+        timestamp: new Date().toISOString(),
+      }],
+    }),
+  });
+
+  if (!response.ok) {
+    let message = "Discord melding kon niet verstuurd worden.";
+    try {
+      const payload = await response.json();
+      message = payload.message || message;
+    } catch {}
+    return message;
+  }
+  return "Discord melding verstuurd naar VOG kanaal.";
+}
+
+async function handleVogRequest(req, res) {
+  const session = requireSession(req, res);
+  if (!session) return true;
+
+  if (req.method === "GET") {
+    const request = await readVogRequest(session.user?.id);
+    sendJson(res, 200, { ok: true, requests: request ? [request] : [] });
+    return true;
+  }
+
+  if (req.method !== "POST") {
+    sendJson(res, 405, { ok: false, message: "Methode niet toegestaan." });
+    return true;
+  }
+
+  try {
+    const body = await readBody(req);
+    const existing = await readVogRequest(session.user?.id);
+    if (existing?.status === "approved") {
+      sendJson(res, 409, { ok: false, message: "Je VOG is al goedgekeurd." });
+      return true;
+    }
+    if (existing?.status === "pending") {
+      sendJson(res, 409, { ok: false, message: "Je hebt al een VOG aanvraag in behandeling." });
+      return true;
+    }
+
+    const item = await writeVogRequest(session.user?.id, normalizeVogRequest(body, session));
+    let notifyMessage = "";
+    try {
+      notifyMessage = await notifyVogRequest(session, item);
+    } catch (error) {
+      notifyMessage = `Discord melding mislukt: ${error.message}`;
+    }
+    await addLog(session, "VOG aanvraag", session.user?.username || session.user?.id || "Discord gebruiker", `In behandeling via website - ${notifyMessage}`);
+    sendJson(res, 201, { ok: true, request: item, message: `VOG aanvraag ingediend. Staff beoordeelt deze via Discord. ${notifyMessage}` });
+  } catch (error) {
+    sendJson(res, 400, { ok: false, message: error.message });
+  }
+  return true;
+}
+
 async function handleCollection(req, res, url, options) {
   const session = requireAdmin(req, res);
   if (!session) return true;
@@ -693,7 +878,7 @@ async function handlePublicQuizzes(req, res) {
 async function handleSummary(req, res) {
   const session = requireAdmin(req, res);
   if (!session) return true;
-  const [dossiers, tasks, applications, certificates, quizzes, quizAttempts, handbooks, serviceSettings, trainingPlans, logs] = await Promise.all([
+  const [dossiers, tasks, applications, certificates, quizzes, quizAttempts, handbooks, serviceSettings, trainingPlans, vogRequests, logs] = await Promise.all([
     readItems("dossiers"),
     readItems("tasks"),
     readItems("applications"),
@@ -703,6 +888,7 @@ async function handleSummary(req, res) {
     readItems("handbooks"),
     readItems("service-settings"),
     readItems("training-plans"),
+    readVogRequests(),
     readItems("logs"),
   ]);
   const byService = {};
@@ -727,6 +913,7 @@ async function handleSummary(req, res) {
       handbooks: handbooks.length,
       serviceSettings: serviceSettings.length,
       trainingPlans: trainingPlans.length,
+      vogRequests: vogRequests.length,
     },
     byService,
     latestLogs: sortNewest(logs).slice(0, 12),
@@ -735,6 +922,7 @@ async function handleSummary(req, res) {
 }
 
 async function handle(req, res, url) {
+  if (url.pathname === "/api/overheid/vog") return handleVogRequest(req, res);
   if (url.pathname === "/api/overheid/quiz-attempts/issue") return handleIssueQuizAttempt(req, res);
   if (url.pathname === "/api/overheid/certificates/issue") return handleIssueCertificate(req, res);
   if (url.pathname === "/api/overheid/certificates/bot-issue") return handleBotIssueCertificate(req, res);

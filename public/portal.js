@@ -441,6 +441,7 @@ async function loadOverheidSummary() {
       ["Pogingen", data.counts.quizAttempts],
       ["Handboeken", data.counts.handbooks],
       ["Trainingen", data.counts.trainingPlans],
+      ["VOG aanvragen", data.counts.vogRequests || 0],
     ].forEach(([label, value]) => {
       const block = document.createElement("div");
       block.appendChild(textNode("span", "", label));
@@ -1081,9 +1082,94 @@ function initCertificateVerify() {
   });
 }
 
+function renderVogRequest(item) {
+  const card = document.createElement("article");
+  card.className = "record-card";
+  const statusMap = {
+    pending: "In behandeling",
+    approved: "Goedgekeurd",
+    denied: "Afgewezen",
+  };
+
+  const header = document.createElement("header");
+  header.appendChild(textNode("h3", "", statusMap[item.status] || item.status || "VOG aanvraag"));
+  header.appendChild(recordBadge(formatDate(item.datum_aanvraag || item.datum || item.createdAt)));
+  card.appendChild(header);
+
+  const meta = document.createElement("div");
+  meta.className = "record-meta";
+  meta.appendChild(recordBadge(item.bron === "website" ? "Via website" : "Via Discord"));
+  if (item.datum_goedkeuring) meta.appendChild(recordBadge("Goedgekeurd: " + formatDate(item.datum_goedkeuring)));
+  if (item.goedgekeurd_door) meta.appendChild(recordBadge("Door: " + item.goedgekeurd_door));
+  card.appendChild(meta);
+
+  card.appendChild(textNode("p", "", item.reden_aanvraag || "Geen reden opgegeven."));
+  if (item.strafblad) card.appendChild(textNode("p", "", "Strafblad: " + item.strafblad));
+  if (item.afgewezen_reden) card.appendChild(textNode("p", "", "Reden afwijzing: " + item.afgewezen_reden));
+  if (item.status === "pending") card.appendChild(textNode("p", "", "Staff bekijkt deze aanvraag via Discord."));
+  return card;
+}
+
+async function loadVogRequests() {
+  const root = document.querySelector("[data-vog-list]");
+  if (!root || window.location.protocol === "file:") return;
+  try {
+    const data = await fetchOverheidJson("/api/overheid/vog");
+    clearNode(root);
+    const requests = data.requests || [];
+    if (!requests.length) {
+      root.appendChild(textNode("p", "empty-text", "Nog geen VOG aanvragen."));
+      return;
+    }
+    requests.forEach((item) => root.appendChild(renderVogRequest(item)));
+  } catch (error) {
+    root.innerHTML = '<p class="empty-text">' + escapeHtml(error.message || "Aanvragen konden niet laden.") + '</p>';
+  }
+}
+
+function initVogForm() {
+  const form = document.querySelector("[data-vog-form]");
+  const feedback = document.querySelector("[data-vog-feedback]");
+  if (!form) return;
+
+  if (window.location.protocol === "file:") {
+    if (feedback) feedback.textContent = "Open via de server om een VOG aan te vragen.";
+    return;
+  }
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (feedback) feedback.textContent = "Aanvraag controleren...";
+
+    const formData = new FormData(form);
+    try {
+      const data = await fetchOverheidJson("/api/overheid/vog", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reason: formData.get("reason"),
+          criminalRecord: formData.get("criminalRecord"),
+          criminalDetails: formData.get("criminalDetails"),
+        }),
+      });
+
+      if (!data.ok) throw new Error(data.message || "Aanvraag mislukt.");
+      const request = data.request;
+      if (feedback) feedback.textContent = data.message || "VOG aanvraag ingediend.";
+      form.reset();
+      await loadVogRequests();
+    } catch (error) {
+      if (feedback) feedback.textContent = error.message || "Aanvraag kon niet verzonden worden.";
+    }
+  });
+
+  loadVogRequests();
+}
+
 initServiceChoice();
 initAuthStatus();
 initQuizzes();
 initOverheidAdminPanel();
 initCertificateVerify();
+initVogForm();
 loadPublicHandbooks();

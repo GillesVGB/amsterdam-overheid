@@ -384,6 +384,16 @@ async function handle(req, res, url) {
 }
 
 async function requirePortalAccess(req, res, url) {
+  if (url.pathname === "/overheid/vog.html") {
+    const session = getSession(req);
+    if (!session) {
+      const next = encodeURIComponent(url.pathname + url.search);
+      redirect(res, `/api/overheid/auth/login?next=${next}`);
+      return false;
+    }
+    return true;
+  }
+
   if (url.pathname === "/overheid/admin.html" || url.pathname.startsWith("/overheid/admin/")) {
     const session = getSession(req);
     if (!session) {
