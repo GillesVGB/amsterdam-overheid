@@ -435,7 +435,6 @@ function vogGuildId() {
 }
 
 function assessVogApplication(body) {
-  const service = cleanField(body.service, 80) || "Algemeen";
   const reason = cleanField(body.reason, 900);
   const criminalRecord = cleanField(body.criminalRecord, 40).toLowerCase();
   const criminalDetails = cleanField(body.criminalDetails, 900);
@@ -452,9 +451,9 @@ function assessVogApplication(body) {
     advocatuur: ["advocaat", "advocatuur", "juridisch", "recht", "client", "cliënt"],
     algemeen: ["overheid", "dienst", "sollicitatie", "support", "functie", "veilig"],
   };
-  const selectedWords = serviceWords[service.toLowerCase()] || serviceWords.algemeen;
+  const allServiceWords = Object.values(serviceWords).flat();
   const generalWords = ["sollicitatie", "worden", "functie", "dienst", "overheid", "vertrouwen", "veilig", "roleplay", "amsterdam"];
-  const matchesPurpose = [...selectedWords, ...generalWords].some((word) => lowerReason.includes(word));
+  const matchesPurpose = [...allServiceWords, ...generalWords].some((word) => lowerReason.includes(word));
 
   if (hasBadRecord) {
     return { approved: false, reason: "Afgewezen omdat er strafbare feiten zijn opgegeven." };
@@ -470,7 +469,6 @@ function assessVogApplication(body) {
 
 function normalizeVogRequest(body, session) {
   const assessment = assessVogApplication(body);
-  const service = cleanField(body.service, 80) || "Algemeen";
   const reason = cleanField(body.reason, 900);
   const criminalRecord = cleanField(body.criminalRecord, 40).toLowerCase();
   const criminalDetails = cleanField(body.criminalDetails, 900);
@@ -482,7 +480,7 @@ function normalizeVogRequest(body, session) {
     datum: new Date().toLocaleString("nl-NL"),
     volledige_naam: session.user?.username || "Discord gebruiker",
     geboortedatum: "Ingediend via website",
-    reden_aanvraag: `[Dienst: ${service}] ${reason}`,
+    reden_aanvraag: reason,
     strafblad: criminalRecord === "nee" ? "Geen" : (criminalDetails || "Ja"),
     datum_aanvraag: new Date().toISOString(),
     goedgekeurd_door: assessment.approved ? "Website controle" : null,

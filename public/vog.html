@@ -31,19 +31,6 @@
 
       <form data-vog-form>
         <label>
-          Voor welke dienst of functie vraag je de VOG aan?
-          <select name="service" required>
-            <option value="">Kies een dienst</option>
-            <option value="Politie">Politie</option>
-            <option value="KMar">KMar / Justitie</option>
-            <option value="Ambulance">Ambulance</option>
-            <option value="Pechhulp">ANWB / Pechhulp</option>
-            <option value="Advocatuur">Advocatuur</option>
-            <option value="Algemeen">Algemene overheid/support functie</option>
-          </select>
-        </label>
-
-        <label>
           Reden van aanvraag
           <textarea name="reason" maxlength="900" required placeholder="Leg duidelijk uit waarom je een VOG nodig hebt. Bijvoorbeeld omdat je politie, KMar, ambulance, pechhulp, advocatuur of een overheid/support functie wilt worden."></textarea>
         </label>
@@ -70,7 +57,27 @@
     </section>
 
     <section class="admin-card">
-      <div class="admin-card-title"><span>Status</span>Mijn VOG</div>
+      <div class="admin-card-title"><span>Controle</span>VOG machine</div>
+      <div class="vog-machine" data-vog-machine>
+        <div class="vog-machine-core" aria-hidden="true">
+          <span></span>
+          <strong>AMRP</strong>
+        </div>
+        <div class="vog-machine-copy">
+          <h2 data-vog-machine-title>Wacht op aanvraag</h2>
+          <p data-vog-machine-text>Na het verzenden controleert het systeem je antwoorden stap voor stap.</p>
+        </div>
+        <div class="vog-scanbar" aria-hidden="true"></div>
+        <ol class="vog-steps">
+          <li data-vog-step="identity">Discord identiteit koppelen</li>
+          <li data-vog-step="service">Dienst of functie herkennen</li>
+          <li data-vog-step="reason">Reden inhoudelijk controleren</li>
+          <li data-vog-step="record">Strafblad controleren</li>
+          <li data-vog-step="decision">Beslissing maken</li>
+        </ol>
+      </div>
+
+      <div class="admin-card-title vog-status-title"><span>Status</span>Mijn VOG</div>
       <div class="record-grid" data-vog-list>
         <p class="empty-text">Status laden...</p>
       </div>

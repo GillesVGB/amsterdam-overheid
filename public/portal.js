@@ -1129,6 +1129,40 @@ async function loadVogRequests() {
   }
 }
 
+function setVogMachine(state, message) {
+  const machine = document.querySelector("[data-vog-machine]");
+  if (!machine) return;
+  const title = document.querySelector("[data-vog-machine-title]");
+  const text = document.querySelector("[data-vog-machine-text]");
+  machine.classList.remove("is-running", "is-approved", "is-denied");
+  if (state) machine.classList.add(state);
+  if (title && message?.title) title.textContent = message.title;
+  if (text && message?.text) text.textContent = message.text;
+}
+
+async function playVogMachine() {
+  const steps = Array.from(document.querySelectorAll("[data-vog-step]"));
+  const labels = {
+    identity: "Discord-profiel wordt gekoppeld...",
+    service: "Aanvraagdoel wordt herkend...",
+    reason: "Reden wordt inhoudelijk nagekeken...",
+    record: "Strafblad wordt gecontroleerd...",
+    decision: "Eindbeslissing wordt gemaakt...",
+  };
+  setVogMachine("is-running", {
+    title: "Controle gestart",
+    text: "De VOG machine bekijkt je aanvraag stap voor stap.",
+  });
+  steps.forEach((step) => step.classList.remove("is-active", "is-done"));
+  for (const step of steps) {
+    step.classList.add("is-active");
+    setVogMachine("is-running", { title: "Aanvraag controleren", text: labels[step.dataset.vogStep] || "Controle bezig..." });
+    await new Promise((resolve) => setTimeout(resolve, 520));
+    step.classList.remove("is-active");
+    step.classList.add("is-done");
+  }
+}
+
 function initVogForm() {
   const form = document.querySelector("[data-vog-form]");
   const feedback = document.querySelector("[data-vog-feedback]");
@@ -1144,24 +1178,32 @@ function initVogForm() {
     if (feedback) feedback.textContent = "Aanvraag controleren...";
 
     const formData = new FormData(form);
+    const machinePromise = playVogMachine();
     try {
       const data = await fetchOverheidJson("/api/overheid/vog", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          service: formData.get("service"),
           reason: formData.get("reason"),
           criminalRecord: formData.get("criminalRecord"),
           criminalDetails: formData.get("criminalDetails"),
         }),
       });
 
+      await machinePromise;
       if (!data.ok) throw new Error(data.message || "Aanvraag mislukt.");
       const request = data.request;
+      if (request.status === "approved") {
+        setVogMachine("is-approved", { title: "VOG goedgekeurd", text: data.message || "Je aanvraag is goedgekeurd." });
+      } else {
+        setVogMachine("is-denied", { title: "VOG afgewezen", text: request.afgewezen_reden || data.message || "Je aanvraag is afgewezen." });
+      }
       if (feedback) feedback.textContent = data.message || "VOG aanvraag ingediend.";
       form.reset();
       await loadVogRequests();
     } catch (error) {
+      await machinePromise;
+      setVogMachine("is-denied", { title: "Controle gestopt", text: error.message || "Aanvraag kon niet verwerkt worden." });
       if (feedback) feedback.textContent = error.message || "Aanvraag kon niet verzonden worden.";
     }
   });
