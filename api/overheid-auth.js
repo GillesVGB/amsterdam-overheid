@@ -6,6 +6,7 @@ const SESSION_COOKIE = "ar_overheid_session";
 const STATE_TTL_MS = 10 * 60 * 1000;
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 const APP_NAME = "overheid";
+const DEFAULT_ADMIN_ROLE_ID = "1518384682532737165";
 
 const services = {
   politie: {
@@ -62,7 +63,7 @@ function getConfig(req) {
     clientSecret: process.env.DISCORD_CLIENT_SECRET || "",
     guildId: process.env.DISCORD_GUILD_ID || "",
     redirectUri: `${publicUrl}/api/overheid/auth/callback`,
-    adminRoleIds: splitIds(process.env.DISCORD_ROLE_ADMIN || process.env.DISCORD_ROLE_STAFF),
+    adminRoleIds: splitIds(process.env.DISCORD_ROLE_ADMIN || process.env.DISCORD_ROLE_STAFF || DEFAULT_ADMIN_ROLE_ID),
     roleMap,
   };
 }
@@ -166,7 +167,7 @@ async function isServiceClosed(serviceId) {
 
 function isAdminSession(session) {
   if (!session) return false;
-  const adminRoleIds = splitIds(process.env.DISCORD_ROLE_ADMIN || process.env.DISCORD_ROLE_STAFF);
+  const adminRoleIds = splitIds(process.env.DISCORD_ROLE_ADMIN || process.env.DISCORD_ROLE_STAFF || DEFAULT_ADMIN_ROLE_ID);
   if (!adminRoleIds.length) return true;
   const roles = new Set(session.roles || []);
   return adminRoleIds.some((roleId) => roles.has(roleId));
