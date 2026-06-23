@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>VOG Aanvraag | Amsterdam Roleplay Overheid</title>
-  <meta name="description" content="Vraag een VOG aan via het Amsterdam Roleplay overheid portaal." />
+  <title>VOG | Amsterdam Roleplay Overheid</title>
+  <meta name="description" content="Vraag je VOG aan via Amsterdam Roleplay." />
   <link rel="icon" type="image/png" href="assets/logo-amsterdam-roleplay.png" />
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -18,67 +18,61 @@
       <div class="top-links">
         <a href="index.html">Diensten</a>
         <a href="vog.html">VOG</a>
-        <a href="https://staff.amsterdamrp.store/staff/">Staff</a>
         <a href="https://amsterdamrp.store/">Hoofdsite</a>
         <a href="/api/overheid/auth/logout">Uitloggen</a>
       </div>
     </nav>
   </header>
 
-  <main>
-    <section class="hero-panel">
-      <div class="container hero-grid">
-        <div class="hero-copy">
-          <p class="eyebrow">Verklaring omtrent gedrag</p>
-          <h1>VOG aanvraag</h1>
-          <p>Vraag je VOG aan. Staff bekijkt je aanvraag via Discord en keurt deze goed of af.</p>
-          <div class="action-row">
-            <a class="button secondary" href="index.html">Terug naar diensten</a>
-          </div>
+  <main class="container vog-page">
+    <section class="admin-card vog-form-card">
+      <div class="admin-card-title"><span>VOG</span>Verklaring Omtrent Gedrag</div>
+      <p>Vul de vragen eerlijk in. De aanvraag wordt automatisch gecontroleerd op een duidelijke reden en op strafbare feiten.</p>
+
+      <form data-vog-form>
+        <label>
+          Voor welke dienst of functie vraag je de VOG aan?
+          <select name="service" required>
+            <option value="">Kies een dienst</option>
+            <option value="Politie">Politie</option>
+            <option value="KMar">KMar / Justitie</option>
+            <option value="Ambulance">Ambulance</option>
+            <option value="Pechhulp">ANWB / Pechhulp</option>
+            <option value="Advocatuur">Advocatuur</option>
+            <option value="Algemeen">Algemene overheid/support functie</option>
+          </select>
+        </label>
+
+        <label>
+          Reden van aanvraag
+          <textarea name="reason" maxlength="900" required placeholder="Leg duidelijk uit waarom je een VOG nodig hebt. Bijvoorbeeld omdat je politie, KMar, ambulance, pechhulp, advocatuur of een overheid/support functie wilt worden."></textarea>
+        </label>
+
+        <label>
+          Heb je strafbare feiten gepleegd?
+          <select name="criminalRecord" required>
+            <option value="">Kies een optie</option>
+            <option value="nee">Nee, ik heb geen strafbare feiten gepleegd</option>
+            <option value="ja">Ja</option>
+          </select>
+        </label>
+
+        <label>
+          Toelichting strafblad
+          <textarea name="criminalDetails" maxlength="900" placeholder="Als je ja koos, licht toe wat er gebeurd is. Bij nee mag dit leeg blijven."></textarea>
+        </label>
+
+        <div class="form-actions">
+          <button class="button" type="submit">Aanvraag verzenden</button>
+          <span data-vog-feedback>Je ziet meteen of je VOG goedgekeurd is.</span>
         </div>
-        <div class="metric-grid">
-          <div><span>Toegang</span><strong>Iedereen</strong></div>
-          <div><span>Controle</span><strong>Discord</strong></div>
-        </div>
-      </div>
+      </form>
     </section>
 
-    <section class="container section">
-      <div class="admin-module-grid">
-        <article class="admin-card">
-          <div class="admin-card-title"><span>◆</span>Nieuwe aanvraag</div>
-          <p>Vul je reden eerlijk in. De website dient alleen je aanvraag in; staff beslist daarna via Discord en zorgt bij goedkeuring voor de rol.</p>
-
-          <form data-vog-form>
-            <label>
-              Reden van aanvraag
-              <textarea name="reason" maxlength="900" required placeholder="Bijvoorbeeld: ik heb een VOG nodig om supportzaken te behandelen binnen Amsterdam Roleplay."></textarea>
-            </label>
-            <label>
-              Strafblad
-              <select name="criminalRecord" required>
-                <option value="">Kies een optie</option>
-                <option value="nee">Nee, geen strafbare feiten gepleegd</option>
-                <option value="ja">Ja, er zijn strafbare feiten</option>
-              </select>
-            </label>
-            <label>
-              Toelichting strafblad
-              <textarea name="criminalDetails" maxlength="900" placeholder="Alleen invullen als je hierboven ja kiest."></textarea>
-            </label>
-            <div class="form-actions">
-              <button class="button" type="submit">VOG aanvragen</button>
-              <span data-vog-feedback>Je aanvraag wordt na verzenden door staff beoordeeld.</span>
-            </div>
-          </form>
-        </article>
-
-        <article class="admin-card">
-          <div class="admin-card-title"><span>✓</span>Mijn aanvragen</div>
-          <div class="record-grid" data-vog-list>
-            <p class="empty-text">Aanvragen laden...</p>
-          </div>
-        </article>
+    <section class="admin-card">
+      <div class="admin-card-title"><span>Status</span>Mijn VOG</div>
+      <div class="record-grid" data-vog-list>
+        <p class="empty-text">Status laden...</p>
       </div>
     </section>
   </main>
@@ -86,7 +80,7 @@
   <footer class="portal-footer">
     <div class="container footer-row">
       <span>Amsterdam Roleplay VOG</span>
-      <span>Discord-login verplicht, dienstrol niet vereist.</span>
+      <span>Discord-login verplicht.</span>
     </div>
   </footer>
   <script src="portal.js"></script>

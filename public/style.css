@@ -139,6 +139,8 @@ td:first-child { color: var(--text); font-weight: 900; }
 .quiz-result.is-error { border-color: rgba(239, 91, 103, 0.48); background: rgba(239, 91, 103, 0.1); }
 .admin-grid, .admin-module-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; }
 .admin-module-grid { grid-template-columns: minmax(320px, 0.92fr) minmax(0, 1.08fr); gap: 22px; }
+.vog-page { display: grid; grid-template-columns: minmax(320px, 0.95fr) minmax(280px, 0.55fr); gap: 18px; align-items: start; padding: 34px 0 48px; }
+.vog-form-card textarea { min-height: 132px; }
 .admin-card { border: 1px solid rgba(54, 184, 208, 0.24); border-radius: 8px; padding: 22px; background: var(--panel-soft); box-shadow: var(--shadow); }
 .admin-card-title { display: flex; align-items: center; gap: 10px; border-left: 4px solid var(--cyan); padding-left: 13px; margin-bottom: 16px; color: var(--text); font-size: 1.1rem; font-weight: 950; }
 .admin-card-title span { color: var(--gold); }
@@ -196,7 +198,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--line-strong); bo
   .portal-nav, .section-head, .footer-row { align-items: flex-start; flex-direction: column; }
   .subnav { overflow-x: auto; flex-wrap: nowrap; padding-bottom: 12px; }
   .subnav a { white-space: nowrap; }
-  .hero-grid, .split, .service-grid, .card-grid, .training-grid, .pdf-grid, .quiz-grid, .info-grid, .rule-grid, .admin-grid, .admin-module-grid, .form-grid { grid-template-columns: 1fr; }
+  .hero-grid, .split, .service-grid, .card-grid, .training-grid, .pdf-grid, .quiz-grid, .info-grid, .rule-grid, .admin-grid, .admin-module-grid, .form-grid, .vog-page { grid-template-columns: 1fr; }
   .hero-grid { min-height: auto; padding: 40px 0; }
   h1 { font-size: clamp(2.35rem, 12vw, 3.3rem); }
 }

@@ -1098,7 +1098,7 @@ function renderVogRequest(item) {
 
   const meta = document.createElement("div");
   meta.className = "record-meta";
-  meta.appendChild(recordBadge(item.bron === "website" ? "Via website" : "Via Discord"));
+  meta.appendChild(recordBadge(item.geboortedatum === "Ingediend via website" ? "Via website" : "Via Discord"));
   if (item.datum_goedkeuring) meta.appendChild(recordBadge("Goedgekeurd: " + formatDate(item.datum_goedkeuring)));
   if (item.goedgekeurd_door) meta.appendChild(recordBadge("Door: " + item.goedgekeurd_door));
   card.appendChild(meta);
@@ -1106,7 +1106,9 @@ function renderVogRequest(item) {
   card.appendChild(textNode("p", "", item.reden_aanvraag || "Geen reden opgegeven."));
   if (item.strafblad) card.appendChild(textNode("p", "", "Strafblad: " + item.strafblad));
   if (item.afgewezen_reden) card.appendChild(textNode("p", "", "Reden afwijzing: " + item.afgewezen_reden));
-  if (item.status === "pending") card.appendChild(textNode("p", "", "Staff bekijkt deze aanvraag via Discord."));
+  if (item.status === "approved") card.appendChild(textNode("p", "", "Je VOG is goedgekeurd. De Discord rol wordt automatisch toegekend wanneer de bot toegang heeft."));
+  if (item.status === "denied") card.appendChild(textNode("p", "", "Je VOG is afgewezen. Pas je aanvraag aan en probeer opnieuw als dit niet klopt."));
+  if (item.status === "pending") card.appendChild(textNode("p", "", "Je aanvraag staat nog in behandeling."));
   return card;
 }
 
@@ -1147,6 +1149,7 @@ function initVogForm() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          service: formData.get("service"),
           reason: formData.get("reason"),
           criminalRecord: formData.get("criminalRecord"),
           criminalDetails: formData.get("criminalDetails"),

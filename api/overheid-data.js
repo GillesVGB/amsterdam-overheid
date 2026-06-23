@@ -426,23 +426,68 @@ function hasMeaningfulReason(reason) {
   return true;
 }
 
+function vogRoleId() {
+  return String(process.env.VOG_ROLE_ID || process.env.DISCORD_ROLE_VOG || "1504849665542062250").trim();
+}
+
+function vogGuildId() {
+  return String(process.env.VOG_DISCORD_GUILD_ID || process.env.SUPPORT_DISCORD_GUILD_ID || process.env.DISCORD_GUILD_ID || "").trim();
+}
+
+function assessVogApplication(body) {
+  const service = cleanField(body.service, 80) || "Algemeen";
+  const reason = cleanField(body.reason, 900);
+  const criminalRecord = cleanField(body.criminalRecord, 40).toLowerCase();
+  const criminalDetails = cleanField(body.criminalDetails, 900);
+  const lowerReason = reason.toLowerCase();
+  const lowerDetails = criminalDetails.toLowerCase();
+  const noCriminalRecord = ["nee", "geen", "false", "no", "0"].includes(criminalRecord);
+  const badCriminalWords = ["ja", "ban", "straf", "crimineel", "overtreding", "arrest", "gevangen", "witwas", "moord", "diefstal", "wapen"];
+  const hasBadRecord = !noCriminalRecord || badCriminalWords.some((word) => lowerDetails.includes(word));
+  const serviceWords = {
+    politie: ["politie", "agent", "korps", "handhaving", "surveillance", "arrestatie"],
+    kmar: ["kmar", "marechaussee", "justitie", "rechtbank", "bewaking", "grens"],
+    ambulance: ["ambulance", "zorg", "medisch", "ehbo", "hulpverlening", "patient", "patiënt"],
+    pechhulp: ["pechhulp", "anwb", "monteur", "voertuig", "reparatie", "takel"],
+    advocatuur: ["advocaat", "advocatuur", "juridisch", "recht", "client", "cliënt"],
+    algemeen: ["overheid", "dienst", "sollicitatie", "support", "functie", "veilig"],
+  };
+  const selectedWords = serviceWords[service.toLowerCase()] || serviceWords.algemeen;
+  const generalWords = ["sollicitatie", "worden", "functie", "dienst", "overheid", "vertrouwen", "veilig", "roleplay", "amsterdam"];
+  const matchesPurpose = [...selectedWords, ...generalWords].some((word) => lowerReason.includes(word));
+
+  if (hasBadRecord) {
+    return { approved: false, reason: "Afgewezen omdat er strafbare feiten zijn opgegeven." };
+  }
+  if (!hasMeaningfulReason(reason) || reason.length < 45) {
+    return { approved: false, reason: "Afgewezen omdat de reden te kort of niet duidelijk genoeg is." };
+  }
+  if (!matchesPurpose) {
+    return { approved: false, reason: "Afgewezen omdat de reden niet duidelijk aansluit bij Politie, KMar, Ambulance, Pechhulp, Advocatuur of overheid." };
+  }
+  return { approved: true, reason: "Automatisch goedgekeurd op basis van duidelijke reden en geen strafblad." };
+}
+
 function normalizeVogRequest(body, session) {
+  const assessment = assessVogApplication(body);
+  const service = cleanField(body.service, 80) || "Algemeen";
   const reason = cleanField(body.reason, 900);
   const criminalRecord = cleanField(body.criminalRecord, 40).toLowerCase();
   const criminalDetails = cleanField(body.criminalDetails, 900);
   if (!reason) throw new Error("Reden van aanvraag is verplicht.");
   if (!criminalRecord) throw new Error("Kies of je een strafblad hebt.");
-  if (!hasMeaningfulReason(reason)) throw new Error("Geef een duidelijkere reden voor je VOG aanvraag.");
 
   return {
-    status: "pending",
+    status: assessment.approved ? "approved" : "denied",
     datum: new Date().toLocaleString("nl-NL"),
     volledige_naam: session.user?.username || "Discord gebruiker",
     geboortedatum: "Ingediend via website",
-    reden_aanvraag: reason,
+    reden_aanvraag: `[Dienst: ${service}] ${reason}`,
     strafblad: criminalRecord === "nee" ? "Geen" : (criminalDetails || "Ja"),
     datum_aanvraag: new Date().toISOString(),
-    bron: "website",
+    goedgekeurd_door: assessment.approved ? "Website controle" : null,
+    datum_goedkeuring: assessment.approved ? new Date().toISOString() : null,
+    afgewezen_reden: assessment.approved ? null : assessment.reason,
   };
 }
 
@@ -548,6 +593,30 @@ async function notifyVogRequest(session, item) {
   return "Discord melding verstuurd naar VOG kanaal.";
 }
 
+async function assignVogRole(userId) {
+  const token = discordBotToken();
+  const guildId = vogGuildId();
+  const roleId = vogRoleId();
+  if (!token || !guildId || !roleId) return "VOG goedgekeurd, maar rol niet gegeven: Discord bot-token/guild/role mist in Render.";
+
+  const response = await fetch(`${DISCORD_API}/guilds/${guildId}/members/${userId}/roles/${roleId}`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bot ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: "",
+  });
+  if (response.status === 204) return "VOG goedgekeurd en Discord rol toegekend.";
+
+  let message = "VOG goedgekeurd, maar Discord rol kon niet toegekend worden.";
+  try {
+    const payload = await response.json();
+    message = `${message} ${payload.message || ""}`.trim();
+  } catch {}
+  return message;
+}
+
 async function handleVogRequest(req, res) {
   const session = requireSession(req, res);
   if (!session) return true;
@@ -576,14 +645,12 @@ async function handleVogRequest(req, res) {
     }
 
     const item = await writeVogRequest(session.user?.id, normalizeVogRequest(body, session));
-    let notifyMessage = "";
-    try {
-      notifyMessage = await notifyVogRequest(session, item);
-    } catch (error) {
-      notifyMessage = `Discord melding mislukt: ${error.message}`;
+    let resultMessage = item.status === "approved" ? "VOG goedgekeurd." : item.afgewezen_reden || "VOG afgewezen.";
+    if (item.status === "approved") {
+      resultMessage = await assignVogRole(session.user?.id);
     }
-    await addLog(session, "VOG aanvraag", session.user?.username || session.user?.id || "Discord gebruiker", `In behandeling via website - ${notifyMessage}`);
-    sendJson(res, 201, { ok: true, request: item, message: `VOG aanvraag ingediend. Staff beoordeelt deze via Discord. ${notifyMessage}` });
+    await addLog(session, "VOG aanvraag", session.user?.username || session.user?.id || "Discord gebruiker", `${item.status} via website - ${resultMessage}`);
+    sendJson(res, 201, { ok: true, request: item, message: resultMessage });
   } catch (error) {
     sendJson(res, 400, { ok: false, message: error.message });
   }
