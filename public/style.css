@@ -139,6 +139,16 @@ td:first-child { color: var(--text); font-weight: 900; }
 .quiz-result.is-error { border-color: rgba(239, 91, 103, 0.48); background: rgba(239, 91, 103, 0.1); }
 .admin-grid, .admin-module-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; }
 .admin-module-grid { grid-template-columns: minmax(320px, 0.92fr) minmax(0, 1.08fr); gap: 22px; }
+body[data-page="admin.html"] .hero-grid { min-height: 300px; padding: 38px 0; }
+body[data-page="admin.html"] h1 { font-size: clamp(2.4rem, 5vw, 4.2rem); }
+.admin-tabbar { position: sticky; top: 79px; z-index: 40; display: grid; grid-template-columns: repeat(auto-fit, minmax(158px, 1fr)); gap: 10px; padding: 14px 0; border-bottom: 1px solid var(--line); background: rgba(7, 11, 15, 0.9); backdrop-filter: blur(16px); }
+.admin-tabbar button { display: grid; gap: 3px; min-height: 58px; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; color: var(--soft); background: linear-gradient(145deg, rgba(16, 24, 33, 0.92), rgba(5, 12, 18, 0.78)); text-align: left; font: inherit; cursor: pointer; }
+.admin-tabbar button:hover, .admin-tabbar button.is-active { border-color: var(--line-strong); background: rgba(54, 184, 208, 0.13); color: var(--text); }
+.admin-tabbar span { color: var(--gold); font-size: 0.66rem; font-weight: 950; letter-spacing: 0.1em; text-transform: uppercase; }
+.admin-tabbar strong { overflow: hidden; font-size: 0.86rem; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; }
+.admin-tab-panel { padding-top: 24px; }
+.admin-tab-panel[hidden] { display: none; }
+.admin-tab-panel .admin-module-grid > .admin-card:last-child .record-grid, .admin-tab-panel > .admin-card .record-grid { max-height: min(66vh, 760px); overflow: auto; padding-right: 4px; }
 .vog-page { display: grid; grid-template-columns: minmax(320px, 0.95fr) minmax(280px, 0.55fr); gap: 18px; align-items: start; padding: 34px 0 48px; }
 .vog-form-card textarea { min-height: 132px; }
 .vog-machine { position: relative; overflow: hidden; display: grid; gap: 14px; margin-bottom: 20px; border: 1px solid rgba(54, 184, 208, 0.24); border-radius: 8px; padding: 18px; background: linear-gradient(145deg, rgba(5, 12, 18, 0.72), rgba(16, 24, 33, 0.88)); }
@@ -219,6 +229,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--line-strong); bo
   .subnav { overflow-x: auto; flex-wrap: nowrap; padding-bottom: 12px; }
   .subnav a { white-space: nowrap; }
   .hero-grid, .split, .service-grid, .card-grid, .training-grid, .pdf-grid, .quiz-grid, .info-grid, .rule-grid, .admin-grid, .admin-module-grid, .form-grid, .vog-page { grid-template-columns: 1fr; }
+  .admin-tabbar { top: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .hero-grid { min-height: auto; padding: 40px 0; }
   h1 { font-size: clamp(2.35rem, 12vw, 3.3rem); }
 }

@@ -1082,6 +1082,53 @@ function initCertificateVerify() {
   });
 }
 
+function initAdminTabs() {
+  if (document.body.dataset.page !== "admin.html") return;
+  const panels = Array.from(document.querySelectorAll("main > .section.slim"));
+  if (panels.length < 2) return;
+
+  const nav = document.createElement("nav");
+  nav.className = "admin-tabbar container";
+  nav.setAttribute("aria-label", "Beheer modules");
+
+  function panelId(panel, index) {
+    const heading = panel.querySelector("h2")?.textContent || "module-" + index;
+    return heading.toLowerCase().replace(/[^a-z0-9À-ÿ]+/gi, "-").replace(/^-+|-+$/g, "") || "module-" + index;
+  }
+
+  const tabs = panels.map((panel, index) => {
+    const id = panelId(panel, index);
+    panel.id = "admin-" + id;
+    panel.classList.add("admin-tab-panel");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.adminTab = panel.id;
+    button.innerHTML = "<span>" + escapeHtml(panel.querySelector(".eyebrow")?.textContent || "Module") + "</span><strong>" + escapeHtml(panel.querySelector("h2")?.textContent || "Beheer") + "</strong>";
+    nav.appendChild(button);
+    return button;
+  });
+
+  panels[0].before(nav);
+
+  function activate(targetId, updateHash = true) {
+    panels.forEach((panel) => {
+      const active = panel.id === targetId;
+      panel.hidden = !active;
+      panel.classList.toggle("is-active", active);
+    });
+    tabs.forEach((tab) => tab.classList.toggle("is-active", tab.dataset.adminTab === targetId));
+    if (updateHash) history.replaceState(null, "", "#" + targetId.replace(/^admin-/, ""));
+  }
+
+  nav.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-admin-tab]");
+    if (button) activate(button.dataset.adminTab);
+  });
+
+  const hashTarget = "admin-" + decodeURIComponent(location.hash.replace(/^#/, ""));
+  activate(panels.some((panel) => panel.id === hashTarget) ? hashTarget : panels[0].id, false);
+}
+
 function renderVogRequest(item) {
   const card = document.createElement("article");
   card.className = "record-card";
@@ -1216,5 +1263,6 @@ initAuthStatus();
 initQuizzes();
 initOverheidAdminPanel();
 initCertificateVerify();
+initAdminTabs();
 initVogForm();
 loadPublicHandbooks();
