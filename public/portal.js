@@ -1082,6 +1082,91 @@ function initCertificateVerify() {
   });
 }
 
+function renderPolitieTeamMember(member) {
+  const card = document.createElement("article");
+  card.className = "politie-team-member";
+  const img = document.createElement("img");
+  img.src = member.avatar || "https://cdn.discordapp.com/embed/avatars/0.png";
+  img.alt = "";
+  img.loading = "lazy";
+  card.appendChild(img);
+
+  const copy = document.createElement("div");
+  copy.className = "politie-team-member-copy";
+  copy.appendChild(textNode("strong", "", member.name || "Onbekende gebruiker"));
+  copy.appendChild(textNode("span", "", member.username ? "@" + member.username.replace(/^@/, "") : member.id || "Discord gebruiker"));
+  card.appendChild(copy);
+  return card;
+}
+
+function renderPolitieTeamGroup(group) {
+  const article = document.createElement("article");
+  article.className = "politie-team-rank";
+  article.style.setProperty("--rank-color", group.role?.color || "#5ad8ff");
+
+  const header = document.createElement("header");
+  const title = document.createElement("div");
+  title.className = "politie-team-rank-title";
+  title.appendChild(textNode("span", "politie-team-dot", ""));
+  title.appendChild(textNode("h3", "", group.name || "Rang"));
+  header.appendChild(title);
+
+  const count = group.members?.length || 0;
+  header.appendChild(recordBadge(count + (count === 1 ? " lid" : " leden")));
+  article.appendChild(header);
+
+  const role = document.createElement("div");
+  role.className = "politie-team-role-chip";
+  role.style.borderColor = group.role?.color || "#5ad8ff";
+  role.innerHTML = '<strong>' + escapeHtml(group.role?.name || group.name || "Discord rol") + '</strong><code>' + escapeHtml(group.role?.id || "Rol niet gevonden") + '</code>';
+  article.appendChild(role);
+
+  if (group.missingRole) {
+    article.appendChild(textNode("p", "empty-text", "Deze rolnaam bestaat nog niet exact in Discord."));
+    return article;
+  }
+
+  const grid = document.createElement("div");
+  grid.className = "politie-team-members";
+  if (!count) {
+    grid.appendChild(textNode("p", "empty-text", "Nog geen leden met deze rang."));
+  } else {
+    group.members.forEach((member) => grid.appendChild(renderPolitieTeamMember(member)));
+  }
+  article.appendChild(grid);
+  return article;
+}
+
+async function initPolitieTeam() {
+  const root = document.querySelector("[data-politie-team]");
+  const badge = document.querySelector("[data-politie-team-badge]");
+  if (!root || window.location.protocol === "file:") return;
+  try {
+    const data = await fetchOverheidJson("/api/overheid/politie/team");
+    clearNode(root);
+    if (badge) {
+      badge.hidden = false;
+      badge.textContent = data.ok
+        ? "Live uit Discord - " + (data.totalMembers || 0) + " unieke leden"
+        : data.message || "Discord team niet beschikbaar.";
+      badge.classList.toggle("is-error", !data.ok);
+    }
+    if (!data.ok) {
+      root.appendChild(textNode("p", "empty-text", data.message || "Team kon niet geladen worden."));
+      return;
+    }
+    (data.groups || []).forEach((group) => root.appendChild(renderPolitieTeamGroup(group)));
+  } catch (error) {
+    clearNode(root);
+    if (badge) {
+      badge.hidden = false;
+      badge.textContent = error.message || "Team kon niet geladen worden.";
+      badge.classList.add("is-error");
+    }
+    root.appendChild(textNode("p", "empty-text", error.message || "Team kon niet geladen worden."));
+  }
+}
+
 function initAdminTabs() {
   if (document.body.dataset.page !== "admin.html") return;
   const panels = Array.from(document.querySelectorAll("main > .section.slim"));
@@ -1265,4 +1350,5 @@ initOverheidAdminPanel();
 initCertificateVerify();
 initAdminTabs();
 initVogForm();
+initPolitieTeam();
 loadPublicHandbooks();

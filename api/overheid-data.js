@@ -11,6 +11,20 @@ const BODY_LIMIT = 1024 * 1024;
 const DISCORD_API = "https://discord.com/api/v10";
 const DISCORD_CACHE_TTL_MS = 5 * 60 * 1000;
 const discordMemberCache = new Map();
+const discordTeamCache = new Map();
+
+const policeTeamRanks = [
+  "| Aspirant",
+  "| Surveillant",
+  "| Agent",
+  "| Hoofdagent",
+  "| Brigadier",
+  "| Inspecteur",
+  "| Hoofd Inspecteur",
+  "| Commissaris",
+  "| Hoofd Commissaris",
+  "| Eerste Hoofd Commissaris",
+];
 
 const defaultServiceSettings = [
   { serviceId: "politie", title: "Politie", status: process.env.DISCORD_SERVICE_POLITIE_OPEN === "false" ? "Gesloten" : "Open" },
@@ -105,6 +119,112 @@ function publicDiscordMember(member, guildId) {
     username: user.discriminator && user.discriminator !== "0" ? `${user.username}#${user.discriminator}` : user.username || "",
     avatar: avatarUrlFromMember(member, guildId),
   };
+}
+
+function normalizeDiscordRoleName(name) {
+  return String(name || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/^@?\s*\|?\s*/, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function discordRoleColor(role) {
+  const rawColor = Number(role?.colors?.primary_color || role?.color || 0);
+  if (!rawColor) return "#5ad8ff";
+  return "#" + rawColor.toString(16).padStart(6, "0");
+}
+
+async function fetchDiscordJson(pathname, token) {
+  const response = await fetch(`${DISCORD_API}${pathname}`, {
+    headers: { Authorization: `Bot ${token}` },
+  });
+  if (!response.ok) {
+    const message = response.status === 403
+      ? "Discord bot mist rechten om leden/rollen te lezen."
+      : "Discord gaf geen geldige response.";
+    throw new Error(message);
+  }
+  return response.json();
+}
+
+async function fetchGuildMembers(guildId, token) {
+  const members = [];
+  let after = "0";
+  for (let page = 0; page < 10; page += 1) {
+    const chunk = await fetchDiscordJson(`/guilds/${guildId}/members?limit=1000&after=${after}`, token);
+    if (!Array.isArray(chunk) || !chunk.length) break;
+    members.push(...chunk);
+    after = chunk[chunk.length - 1]?.user?.id || after;
+    if (chunk.length < 1000) break;
+  }
+  return members;
+}
+
+async function buildPoliceTeam() {
+  const token = discordBotToken();
+  const guildId = discordGuildId();
+  if (!token || !guildId) {
+    return {
+      ok: false,
+      message: "Discord bot-token of guild ID ontbreekt in Render.",
+      groups: [],
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  const cacheKey = `politie:${guildId}`;
+  const cached = discordTeamCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.payload;
+
+  const [roles, members] = await Promise.all([
+    fetchDiscordJson(`/guilds/${guildId}/roles`, token),
+    fetchGuildMembers(guildId, token),
+  ]);
+
+  const rolesByName = new Map();
+  for (const role of roles || []) {
+    const normalized = normalizeDiscordRoleName(role.name);
+    if (normalized && !rolesByName.has(normalized)) rolesByName.set(normalized, role);
+  }
+
+  const groups = policeTeamRanks.map((rankName) => {
+    const normalized = normalizeDiscordRoleName(rankName);
+    const role = rolesByName.get(normalized);
+    const roleMembers = role
+      ? members
+        .filter((member) => Array.isArray(member.roles) && member.roles.includes(role.id))
+        .map((member) => publicDiscordMember(member, guildId))
+        .sort((a, b) => a.name.localeCompare(b.name, "nl", { sensitivity: "base" }))
+      : [];
+
+    return {
+      name: rankName,
+      key: normalized.replace(/\s+/g, "-"),
+      role: role ? {
+        id: role.id,
+        name: role.name,
+        color: discordRoleColor(role),
+      } : {
+        id: "",
+        name: rankName,
+        color: "#5ad8ff",
+      },
+      members: roleMembers,
+      missingRole: !role,
+    };
+  });
+
+  const payload = {
+    ok: true,
+    groups,
+    totalMembers: new Set(groups.flatMap((group) => group.members.map((member) => member.id))).size,
+    updatedAt: new Date().toISOString(),
+  };
+  discordTeamCache.set(cacheKey, { expiresAt: Date.now() + DISCORD_CACHE_TTL_MS, payload });
+  return payload;
 }
 
 function getBearerToken(req) {
@@ -906,6 +1026,31 @@ async function handleDiscordMember(req, res, url) {
   return true;
 }
 
+async function handlePoliceTeam(req, res) {
+  const session = requireSession(req, res);
+  if (!session) return true;
+  if (!Array.isArray(session.services) || !session.services.includes("politie")) {
+    sendJson(res, 403, { ok: false, message: "Geen toegang tot het politie-teamoverzicht." });
+    return true;
+  }
+  if (req.method !== "GET") {
+    sendJson(res, 405, { ok: false, message: "Methode niet toegestaan." });
+    return true;
+  }
+
+  try {
+    sendJson(res, 200, await buildPoliceTeam());
+  } catch (error) {
+    sendJson(res, 502, {
+      ok: false,
+      message: error.message || "Politie-team kon niet opgehaald worden uit Discord.",
+      groups: [],
+      updatedAt: new Date().toISOString(),
+    });
+  }
+  return true;
+}
+
 async function handlePublicServiceSettings(req, res) {
   const settings = await readItems("service-settings");
   const merged = defaultServiceSettings.map((fallback) => {
@@ -1007,6 +1152,7 @@ async function handle(req, res, url) {
   if (url.pathname === "/api/overheid/certificates/bot-issue") return handleBotIssueCertificate(req, res);
   if (url.pathname === "/api/overheid/certificates/verify" && req.method === "GET") return handleVerifyCertificate(req, res, url);
   if (url.pathname === "/api/overheid/discord/member") return handleDiscordMember(req, res, url);
+  if (url.pathname === "/api/overheid/politie/team") return handlePoliceTeam(req, res);
   if (url.pathname === "/api/overheid/service-settings/public" && req.method === "GET") return handlePublicServiceSettings(req, res);
   if (url.pathname === "/api/overheid/handbooks/public" && req.method === "GET") return handlePublicCollection(req, res, "handbooks", "handbooks");
   if (url.pathname === "/api/overheid/quizzes/public" && req.method === "GET") return handlePublicQuizzes(req, res);

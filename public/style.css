@@ -210,6 +210,25 @@ input:focus, select:focus, textarea:focus { border-color: var(--line-strong); bo
 .record-link-list, .record-note-list { margin-top: 12px; border: 1px solid var(--line); border-radius: 8px; padding: 11px; background: rgba(54, 184, 208, 0.055); }
 .record-link-list strong, .record-note-list strong { display: block; margin-bottom: 8px; color: var(--text); font-size: 0.82rem; }
 .record-link-list a { display: inline-flex; margin: 0 8px 8px 0; color: var(--gold); font-weight: 900; }
+.team-live-badge { display: inline-flex; width: fit-content; margin-bottom: 14px; border: 1px solid rgba(90, 216, 255, 0.28); border-radius: 999px; padding: 8px 12px; color: var(--cyan); background: rgba(90, 216, 255, 0.08); font-size: 0.78rem; font-weight: 950; }
+.team-live-badge.is-error { color: #ffc5ca; border-color: rgba(239, 91, 103, 0.36); background: rgba(239, 91, 103, 0.1); }
+.politie-team-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.politie-team-rank { position: relative; overflow: hidden; border: 1px solid rgba(90, 216, 255, 0.18); border-radius: 18px; padding: 16px; background: linear-gradient(145deg, rgba(10, 29, 43, 0.88), rgba(4, 14, 22, 0.74)); box-shadow: var(--shadow); }
+.politie-team-rank::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--rank-color, var(--cyan)); box-shadow: 0 0 26px var(--rank-color, var(--cyan)); }
+.politie-team-rank header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; padding-left: 4px; }
+.politie-team-rank-title { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.politie-team-rank h3 { margin: 0; color: var(--text); font-size: 1.12rem; line-height: 1.1; }
+.politie-team-dot { flex: 0 0 auto; width: 11px; height: 11px; border-radius: 50%; background: var(--rank-color, var(--cyan)); box-shadow: 0 0 18px var(--rank-color, var(--cyan)); }
+.politie-team-role-chip { display: inline-grid; gap: 2px; max-width: 100%; margin-bottom: 12px; border: 1px solid; border-radius: 999px; padding: 8px 12px; background: rgba(255, 255, 255, 0.035); }
+.politie-team-role-chip strong { overflow: hidden; color: var(--text); font-size: 0.82rem; line-height: 1.1; text-overflow: ellipsis; white-space: nowrap; }
+.politie-team-role-chip code { color: var(--muted); font-size: 0.72rem; }
+.politie-team-members { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 9px; }
+.politie-team-member { display: flex; align-items: center; gap: 10px; min-width: 0; border: 1px solid rgba(126, 221, 255, 0.16); border-radius: 14px; padding: 9px; background: rgba(5, 12, 18, 0.45); }
+.politie-team-member img { flex: 0 0 auto; width: 38px; height: 38px; border-radius: 50%; object-fit: cover; background: #06131e; }
+.politie-team-member-copy { display: grid; min-width: 0; line-height: 1.15; }
+.politie-team-member-copy strong, .politie-team-member-copy span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.politie-team-member-copy strong { color: var(--text); font-size: 0.86rem; }
+.politie-team-member-copy span { margin-top: 3px; color: var(--muted); font-size: 0.72rem; font-weight: 850; }
 .certificate-result.is-valid { border-color: rgba(73, 197, 122, 0.38); background: rgba(73, 197, 122, 0.08); }
 .certificate-result.is-invalid { border-color: rgba(239, 91, 103, 0.38); background: rgba(239, 91, 103, 0.08); }
 .portal-footer { border-top: 1px solid var(--line); background: rgba(7, 11, 15, 0.9); }
@@ -228,7 +247,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--line-strong); bo
   .portal-nav, .section-head, .footer-row { align-items: flex-start; flex-direction: column; }
   .subnav { overflow-x: auto; flex-wrap: nowrap; padding-bottom: 12px; }
   .subnav a { white-space: nowrap; }
-  .hero-grid, .split, .service-grid, .card-grid, .training-grid, .pdf-grid, .quiz-grid, .info-grid, .rule-grid, .admin-grid, .admin-module-grid, .form-grid, .vog-page { grid-template-columns: 1fr; }
+  .hero-grid, .split, .service-grid, .card-grid, .training-grid, .pdf-grid, .quiz-grid, .info-grid, .rule-grid, .admin-grid, .admin-module-grid, .form-grid, .vog-page, .politie-team-grid { grid-template-columns: 1fr; }
   .admin-tabbar { top: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .hero-grid { min-height: auto; padding: 40px 0; }
   h1 { font-size: clamp(2.35rem, 12vw, 3.3rem); }
