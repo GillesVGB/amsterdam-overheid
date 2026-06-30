@@ -233,3 +233,200 @@ input:focus, select:focus, textarea:focus { border-color: var(--line-strong); bo
   .hero-grid { min-height: auto; padding: 40px 0; }
   h1 { font-size: clamp(2.35rem, 12vw, 3.3rem); }
 }
+
+/* Amsterdam cyan refresh */
+:root {
+  --bg: #041019;
+  --panel: #0b1d2b;
+  --panel-soft: rgba(9, 29, 44, 0.76);
+  --line: rgba(126, 221, 255, 0.18);
+  --line-strong: rgba(126, 221, 255, 0.48);
+  --text: #eef9fd;
+  --muted: #a8c7d8;
+  --soft: #d9f4ff;
+  --cyan: #5ad8ff;
+  --blue: #2d8cff;
+  --gold: #8eeaff;
+  --shadow: 0 26px 90px rgba(0, 0, 0, 0.36);
+}
+
+body {
+  background: var(--bg);
+}
+
+body::before {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(90, 216, 255, 0.24), transparent 30%),
+    radial-gradient(circle at 82% 12%, rgba(45, 140, 255, 0.19), transparent 30%),
+    linear-gradient(180deg, rgba(4, 16, 25, 0.74), var(--bg) 80%),
+    url("assets/banner-amsterdam-roleplay.webp") center / cover;
+  opacity: 0.76;
+}
+
+.login-page::before {
+  background:
+    radial-gradient(circle at 50% 4%, rgba(90, 216, 255, 0.26), transparent 26%),
+    radial-gradient(circle at 84% 76%, rgba(45, 140, 255, 0.18), transparent 32%),
+    linear-gradient(180deg, rgba(4, 16, 25, 0.76), rgba(4, 16, 25, 0.96)),
+    url("assets/banner-amsterdam-roleplay.webp") center / cover;
+}
+
+.login-card,
+.portal-header,
+.admin-tabbar,
+.portal-footer {
+  background: rgba(3, 12, 20, 0.78);
+  backdrop-filter: blur(20px);
+}
+
+.login-card {
+  border-radius: 24px;
+  border-color: var(--line-strong);
+  box-shadow: 0 36px 120px rgba(0, 0, 0, 0.54), 0 0 60px rgba(90, 216, 255, 0.08);
+}
+
+.login-logo,
+.brand img {
+  border-radius: 50%;
+  filter: drop-shadow(0 16px 32px rgba(90, 216, 255, 0.22));
+}
+
+.top-links a,
+.subnav a,
+.login-links a,
+.button,
+.discord-login,
+.mini-button,
+.quiz-card button,
+.quiz-panel button,
+.service-card strong,
+.pdf-card strong,
+.text-link {
+  border-radius: 999px;
+}
+
+.top-links a,
+.subnav a,
+.login-links a {
+  background: rgba(126, 221, 255, 0.045);
+}
+
+.top-links a:hover,
+.subnav a:hover,
+.subnav a.is-active,
+.login-links a:hover {
+  border-color: var(--line-strong);
+  background: rgba(90, 216, 255, 0.14);
+}
+
+.discord-login,
+.button,
+.quiz-card button,
+.quiz-panel button {
+  color: #03131f;
+  background: linear-gradient(135deg, var(--cyan), #bff2ff 45%, var(--blue));
+  box-shadow: 0 16px 42px rgba(45, 140, 255, 0.24);
+}
+
+.discord-login:hover,
+.button:hover,
+.quiz-card button:hover,
+.quiz-panel button:hover {
+  transform: translateY(-2px);
+  background: linear-gradient(135deg, #8eeaff, #d8f8ff 45%, #4da1ff);
+}
+
+.selected-login,
+.auth-status,
+.login-service,
+.service-card,
+.tool-card,
+.training-card,
+.pdf-card,
+.notice-panel,
+.rule-grid article,
+.info-grid article,
+.metric-grid div,
+.quiz-card,
+.quiz-panel,
+.quiz-state,
+.quiz-question,
+.admin-card,
+.record-card,
+.admin-status-list div,
+.vog-machine,
+.table-wrap,
+.record-link-list,
+.record-note-list,
+.certificate-result {
+  border-radius: 18px;
+  border-color: var(--line);
+  background: linear-gradient(145deg, rgba(12, 38, 55, 0.82), rgba(4, 16, 25, 0.76));
+  backdrop-filter: blur(14px);
+}
+
+.login-service:hover,
+.login-service.is-selected,
+.service-card:hover,
+.tool-card:hover,
+.pdf-card:hover,
+.record-card:hover {
+  border-color: var(--line-strong);
+  background: linear-gradient(145deg, rgba(15, 57, 82, 0.86), rgba(6, 24, 36, 0.78));
+  box-shadow: 0 24px 64px rgba(45, 140, 255, 0.14);
+}
+
+.service-meta,
+.tool-card span,
+.training-card span,
+.pdf-card span,
+.status-badge {
+  border-color: rgba(126, 221, 255, 0.24);
+  color: var(--cyan);
+  background: rgba(90, 216, 255, 0.08);
+}
+
+.hero-panel {
+  background: linear-gradient(180deg, rgba(90, 216, 255, 0.06), transparent);
+}
+
+.metric-grid div {
+  border-color: var(--line-strong);
+}
+
+.admin-card-title {
+  border-left-color: var(--cyan);
+  text-shadow: 0 0 18px rgba(90, 216, 255, 0.12);
+}
+
+.admin-card-title span,
+.record-link-list a,
+.notice-panel a {
+  color: var(--cyan);
+}
+
+input,
+select,
+textarea {
+  border-radius: 14px;
+  border-color: var(--line);
+  background: rgba(3, 12, 20, 0.62);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--line-strong);
+  box-shadow: 0 0 0 4px rgba(90, 216, 255, 0.12);
+}
+
+.vog-machine-core {
+  border-color: var(--line-strong);
+  background: radial-gradient(circle, rgba(90, 216, 255, 0.24), rgba(4, 16, 25, 0.86) 62%);
+  box-shadow: 0 0 48px rgba(90, 216, 255, 0.18);
+}
+
+.vog-scanbar::before,
+.rule-grid article::before {
+  background: linear-gradient(90deg, var(--cyan), var(--blue));
+}
