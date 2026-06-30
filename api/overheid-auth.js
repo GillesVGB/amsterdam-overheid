@@ -13,6 +13,7 @@ const services = {
     label: "Politie",
     path: "/overheid/politie/index.html",
     roleEnv: "DISCORD_ROLE_POLITIE",
+    closed: process.env.DISCORD_SERVICE_POLITIE_OPEN === "false",
   },
   kmar: {
     label: "KMar / Justitie",
@@ -24,11 +25,13 @@ const services = {
     label: "Ambulance",
     path: "/overheid/diensten/ambulance.html",
     roleEnv: "DISCORD_ROLE_AMBULANCE",
+    closed: process.env.DISCORD_SERVICE_AMBULANCE_OPEN !== "true",
   },
   pechhulp: {
     label: "ANWB / Pechhulp",
     path: "/overheid/diensten/pechhulp.html",
     roleEnv: "DISCORD_ROLE_PECHHULP",
+    closed: process.env.DISCORD_SERVICE_PECHHULP_OPEN !== "true",
   },
 };
 
@@ -160,9 +163,10 @@ async function getServiceSettings() {
 }
 
 async function isServiceClosed(serviceId) {
+  if (services[serviceId]?.closed) return true;
   const setting = (await getServiceSettings()).find((item) => item.serviceId === serviceId);
   if (setting?.status) return setting.status.toLowerCase() === "gesloten";
-  return Boolean(services[serviceId]?.closed);
+  return false;
 }
 
 function isAdminSession(session) {

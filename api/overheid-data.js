@@ -12,6 +12,13 @@ const DISCORD_API = "https://discord.com/api/v10";
 const DISCORD_CACHE_TTL_MS = 5 * 60 * 1000;
 const discordMemberCache = new Map();
 
+const defaultServiceSettings = [
+  { serviceId: "politie", title: "Politie", status: process.env.DISCORD_SERVICE_POLITIE_OPEN === "false" ? "Gesloten" : "Open" },
+  { serviceId: "kmar", title: "KMar / Justitie", status: process.env.DISCORD_SERVICE_KMAR_OPEN === "true" ? "Open" : "Gesloten" },
+  { serviceId: "ambulance", title: "Ambulance", status: process.env.DISCORD_SERVICE_AMBULANCE_OPEN === "true" ? "Open" : "Gesloten" },
+  { serviceId: "pechhulp", title: "ANWB / Pechhulp", status: process.env.DISCORD_SERVICE_PECHHULP_OPEN === "true" ? "Open" : "Gesloten" },
+];
+
 const files = {
   dossiers: path.join(DATA_DIR, "overheid-dossiers.json"),
   tasks: path.join(DATA_DIR, "overheid-tasks.json"),
@@ -901,9 +908,16 @@ async function handleDiscordMember(req, res, url) {
 
 async function handlePublicServiceSettings(req, res) {
   const settings = await readItems("service-settings");
+  const merged = defaultServiceSettings.map((fallback) => {
+    const setting = settings.find((item) => item.serviceId === fallback.serviceId);
+    if (!setting) return fallback;
+    const forcedClosed = String(fallback.status || "").toLowerCase() === "gesloten";
+    return { ...fallback, ...setting, status: forcedClosed ? "Gesloten" : setting.status || fallback.status };
+  });
+
   sendJson(res, 200, {
     ok: true,
-    services: settings.map((item) => ({
+    services: merged.map((item) => ({
       serviceId: item.serviceId,
       title: item.title,
       status: item.status,
